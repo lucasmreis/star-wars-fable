@@ -1,0 +1,17 @@
+{
+  "name": "star-wars-fable",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "fable src/Main.fsx -o ./build --rollup --verbose --sourceMaps --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "fable-arch": "^0.9.12",
+    "fable-compiler": "^0.7.8",
+    "fable-core": "^0.7.8"
+  }
+}
