@@ -37,8 +37,7 @@ module Film =
 
     let view model =
         div
-            [ mainStyle
-              onMouseClick (fun _ -> model) ]
+            [ mainStyle ]
             [ div [ numberStyle ] [ text (model.episodeId.ToString()) ]
               div [ nameStyle ] [ text model.title ] ]
 
@@ -75,6 +74,13 @@ module Character =
 // MAIN
 //
 
+type Model =
+    | InitialScreen
+    | LoadingFilms of Character.Model
+    | LoadingCharacters of Film.Model
+    | FilmsFromCharacter of Character.Model * Film.Model list
+    | CharactersFromFilm of Film.Model * Character.Model list
+
 let initChar:Character.Model =
     { name = "Personagem"
       films = ["as"; "df"; "gh"; "jk"] }
@@ -84,14 +90,46 @@ let initFilm:Film.Model =
       episodeId = 7
       characters = ["as"; "df"; "gh"; "jk"] }
 
-let init = (initChar, initFilm)
+let init = LoadingFilms initChar
+
+// UPDATE
+
+type Msg
+    = LoadCharacters of Film.Model
+    | ToCharactersFromFilm of Film.Model * Character.Model list
+    | LoadFilms of Character.Model
+    | ToFilmsFromCharacter of Character.Model * Film.Model
+    | FetchFail
 
 let update model msg = model, []
 
-let view (ch, film) =
-    let chView = Character.view ch
-    let filmView = Film.view film
-    div [] [ chView ; filmView ]
+// VIEW
+
+let loadingStyle =
+    Style
+        [ "margin", "20px 0px 0px 20px"
+          "width", "200px"
+          "height", "200px"
+          "font-family", "-apple-system, system, sans-serif"
+          "color", "rgba(149, 165, 166,1.0)"
+          "font-size", "18px" ]
+
+let loadingView t =
+    div [ loadingStyle ] [ text t ]
+
+let view model =
+    match model with
+    | InitialScreen ->
+        loadingView "Loading amazing characters and films..."
+
+    | LoadingFilms ch ->
+        div [ Style [ "display", "flex" ] ]
+            [ Character.view ch
+              loadingView ("Loading " + ch.name + " films...") ]
+
+    | _ -> div [] []
+
+// APP
 
 createApp init view update Virtualdom.createRender
 |> withStartNodeSelector "#app"
