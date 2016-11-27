@@ -37,7 +37,7 @@ module Film =
 
     let view model =
         div
-            [ mainStyle ]
+            [ mainStyle ; onMouseClick (fun _ -> model) ]
             [ div [ numberStyle ] [ text (model.episodeId.ToString()) ]
               div [ nameStyle ] [ text model.title ] ]
 
@@ -66,7 +66,7 @@ module Character =
 
     let view model =
         div
-            [ mainStyle; onMouseClick (fun _ -> model) ]
+            [ mainStyle ; onMouseClick (fun _ -> model) ]
             [ div [ nameStyle ] [ text model.name ] ]
 
 
@@ -90,7 +90,7 @@ let initFilm:Film.Model =
       episodeId = 7
       characters = ["as"; "df"; "gh"; "jk"] }
 
-let init = LoadingFilms initChar
+let init = CharactersFromFilm ( initFilm , [ initChar ; initChar ; initChar ] )
 
 // UPDATE
 
@@ -98,10 +98,21 @@ type Msg
     = LoadCharacters of Film.Model
     | ToCharactersFromFilm of Film.Model * Character.Model list
     | LoadFilms of Character.Model
-    | ToFilmsFromCharacter of Character.Model * Film.Model
+    | ToFilmsFromCharacter of Character.Model * Film.Model list
     | FetchFail
 
-let update model msg = model, []
+let getCharacters film =
+    async {
+        return ToCharactersFromFilm ( film , [ initChar ; initChar ; initChar ] ) }
+
+
+let update model msg =
+    match msg with
+    | LoadCharacters f -> LoadingCharacters f , []
+    | ToCharactersFromFilm ( f , chs ) -> CharactersFromFilm ( f , chs ), []
+    | LoadFilms ch -> LoadingFilms ch , []
+    | ToFilmsFromCharacter ( ch , fs ) -> FilmsFromCharacter ( ch , fs ), []
+    | _ -> model , []
 
 // VIEW
 
@@ -117,6 +128,12 @@ let loadingStyle =
 let loadingView t =
     div [ loadingStyle ] [ text t ]
 
+let mappedCharacterView =
+    Character.view >> Html.map LoadFilms
+
+let mappedFilmView =
+    Film.view >> Html.map LoadCharacters
+
 let view model =
     match model with
     | InitialScreen ->
@@ -124,10 +141,25 @@ let view model =
 
     | LoadingFilms ch ->
         div [ Style [ "display", "flex" ] ]
-            [ Character.view ch
+            [ mappedCharacterView ch
               loadingView ("Loading " + ch.name + " films...") ]
 
-    | _ -> div [] []
+    | FilmsFromCharacter (ch, fs) ->
+        let filmsView = List.map mappedFilmView fs
+        div [ Style [ "display", "flex" ] ]
+            [ mappedCharacterView ch
+              div [] filmsView ]
+
+    | LoadingCharacters f ->
+        div [ Style [ "display", "flex" ] ]
+            [ mappedFilmView f
+              loadingView ("Loading " + f.title + " characters...") ]
+
+    | CharactersFromFilm (f, chs) ->
+        let chsView = List.map mappedCharacterView chs
+        div [ Style [ "display", "flex" ] ]
+            [ mappedFilmView f
+              div [] chsView ]
 
 // APP
 
