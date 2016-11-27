@@ -3,6 +3,7 @@
 #load "../node_modules/fable-arch/Fable.Arch.App.fs"
 #load "../node_modules/fable-arch/Fable.Arch.Virtualdom.fs"
 
+open Fable.Import.Browser
 open Fable.Arch
 open Fable.Arch.Html
 open Fable.Arch.App.AppApi
@@ -90,7 +91,6 @@ let initFilm:Film.Model =
       episodeId = 7
       characters = ["as"; "df"; "gh"; "jk"] }
 
-let init = CharactersFromFilm ( initFilm , [ initChar ; initChar ; initChar ] )
 
 // UPDATE
 
@@ -101,16 +101,27 @@ type Msg
     | ToFilmsFromCharacter of Character.Model * Film.Model list
     | FetchFail
 
-let getCharacters film =
-    async {
-        return ToCharactersFromFilm ( film , [ initChar ; initChar ; initChar ] ) }
 
+let getCharacter handler =
+    let cb = fun _ -> handler (LoadFilms initChar)
+    window.setTimeout(cb , 1000) |> ignore
+    ()
+
+let getCharacters film handler =
+    let cb = fun _ -> handler (ToCharactersFromFilm ( film , [ initChar ; initChar ; initChar ] ))
+    window.setTimeout(cb , 1000) |> ignore
+    ()
+
+let getFilms character handler =
+    let cb = fun _ -> handler (ToFilmsFromCharacter ( character , [ initFilm ; initFilm ; initFilm ] ))
+    window.setTimeout(cb , 1000) |> ignore
+    ()
 
 let update model msg =
     match msg with
-    | LoadCharacters f -> LoadingCharacters f , []
+    | LoadCharacters f -> LoadingCharacters f , [ getCharacters f ]
     | ToCharactersFromFilm ( f , chs ) -> CharactersFromFilm ( f , chs ), []
-    | LoadFilms ch -> LoadingFilms ch , []
+    | LoadFilms ch -> LoadingFilms ch , [ getFilms ch ]
     | ToFilmsFromCharacter ( ch , fs ) -> FilmsFromCharacter ( ch , fs ), []
     | _ -> model , []
 
@@ -163,6 +174,8 @@ let view model =
 
 // APP
 
-createApp init view update Virtualdom.createRender
+createApp InitialScreen view update Virtualdom.createRender
 |> withStartNodeSelector "#app"
+|> withInitMessage getCharacter
+|> withSubscriber (fun x -> Fable.Import.Browser.console.log("Event received: ", x))
 |> start
