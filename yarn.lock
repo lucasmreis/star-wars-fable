@@ -833,6 +833,10 @@ fable-import-virtualdom@^0.8.1:
   version "0.8.1"
   resolved "https://registry.yarnpkg.com/fable-import-virtualdom/-/fable-import-virtualdom-0.8.1.tgz#9af0a4c666eb11c48d3d48cb6507ff558221408e"
 
+fable-powerpack@0.0.14:
+  version "0.0.14"
+  resolved "https://registry.yarnpkg.com/fable-powerpack/-/fable-powerpack-0.0.14.tgz#15d0d20e4ae7ef653304798234b2864a00fdf7d4"
+
 feature-detect-es6@^1.3.1:
   version "1.3.1"
   resolved "https://registry.yarnpkg.com/feature-detect-es6/-/feature-detect-es6-1.3.1.tgz#f888736af9cb0c91f55663bfa4762eb96ee7047f"

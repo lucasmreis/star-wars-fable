@@ -1,9 +1,16 @@
 #r "../node_modules/fable-core/Fable.Core.dll"
+#r "../node_modules/fable-powerpack/Fable.PowerPack.dll"
 #load "../node_modules/fable-arch/Fable.Arch.Html.fs"
 #load "../node_modules/fable-arch/Fable.Arch.App.fs"
 #load "../node_modules/fable-arch/Fable.Arch.Virtualdom.fs"
 
+open System
 open Fable.Import.Browser
+open Fable.Core.JsInterop
+
+open Fable.PowerPack
+open Fable.PowerPack.Fetch
+
 open Fable.Arch
 open Fable.Arch.Html
 open Fable.Arch.App.AppApi
@@ -15,6 +22,20 @@ module Film =
         { title: string
           episodeId: int
           characters: string list }
+
+    type ModelJSON =
+        { title: string
+          episode_id: int
+          characters: string list }
+
+    let parse (obj:ModelJSON) =
+        try
+            Some
+                { title = obj.title
+                  episodeId = obj.episode_id
+                  characters = obj.characters }
+        with _ -> None
+
 
     let mainStyle =
         Style
@@ -49,6 +70,15 @@ module Character =
         { name: string
           films: string list }
 
+    type ModelJSON = Model
+
+    let parse (obj:ModelJSON):Model option =
+        try
+            Some
+                { name = obj.name
+                  films = obj.films }
+        with _ -> None
+
     let mainStyle =
         Style
             [ "background-color", "rgba(230, 126, 34,1.0)"
@@ -81,6 +111,7 @@ type Model =
     | LoadingCharacters of Film.Model
     | FilmsFromCharacter of Character.Model * Film.Model list
     | CharactersFromFilm of Film.Model * Character.Model list
+    | ErrorScreen
 
 let initChar:Character.Model =
     { name = "Personagem"
@@ -91,7 +122,6 @@ let initFilm:Film.Model =
       episodeId = 7
       characters = ["as"; "df"; "gh"; "jk"] }
 
-
 // UPDATE
 
 type Msg
@@ -101,21 +131,58 @@ type Msg
     | ToFilmsFromCharacter of Character.Model * Film.Model list
     | FetchFail
 
+let fetchEntity url jsonFn parseFn =
+    promise {
+        let! response = fetch(url, [])
+        let! body = if response.Ok then response.text() else failwith "http error"
+        let json = jsonFn(body)
+        return
+            match parseFn json with
+            | Some entity -> entity
+            | None -> failwith "json schema error" }
 
 let getCharacter handler =
-    let cb = fun _ -> handler (LoadFilms initChar)
-    window.setTimeout(cb , 1000) |> ignore
-    ()
+    promise {
+        try
+            let! character = fetchEntity "http://swapi.co/api/people/1/" ofJson<Character.ModelJSON> Character.parse
+            return LoadFilms character
+        with e ->
+            window.console.error("Fetch Error:", e)
+            return FetchFail }
+    |> Promise.map handler
+    |> ignore
 
-let getCharacters film handler =
-    let cb = fun _ -> handler (ToCharactersFromFilm ( film , [ initChar ; initChar ; initChar ] ))
-    window.setTimeout(cb , 1000) |> ignore
-    ()
+let getCharacters (film: Film.Model) handler =
+    film.characters
+        |> List.map ( fun url -> promise {
+            try
+                let! character = fetchEntity url ofJson<Character.ModelJSON> Character.parse
+                return Some character
+            with e ->
+                return None } )
+        |> Promise.Parallel
+        |> Promise.map (
+            Array.choose id
+            >> Array.toList
+            >> fun chs -> ToCharactersFromFilm (film, chs)
+            >> handler )
+        |> ignore
 
-let getFilms character handler =
-    let cb = fun _ -> handler (ToFilmsFromCharacter ( character , [ initFilm ; initFilm ; initFilm ] ))
-    window.setTimeout(cb , 1000) |> ignore
-    ()
+let getFilms (character: Character.Model) handler =
+    character.films
+        |> List.map ( fun url -> promise {
+            try
+                let! film = fetchEntity url ofJson<Film.ModelJSON> Film.parse
+                return Some film
+            with e ->
+                return None } )
+        |> Promise.Parallel
+        |> Promise.map (
+            Array.choose id
+            >> Array.toList
+            >> fun fs -> ToFilmsFromCharacter (character, fs)
+            >> handler )
+        |> ignore
 
 let update model msg =
     match msg with
@@ -123,7 +190,7 @@ let update model msg =
     | ToCharactersFromFilm ( f , chs ) -> CharactersFromFilm ( f , chs ), []
     | LoadFilms ch -> LoadingFilms ch , [ getFilms ch ]
     | ToFilmsFromCharacter ( ch , fs ) -> FilmsFromCharacter ( ch , fs ), []
-    | _ -> model , []
+    | FetchFail -> ErrorScreen , []
 
 // VIEW
 
@@ -136,7 +203,7 @@ let loadingStyle =
           "color", "rgba(149, 165, 166,1.0)"
           "font-size", "18px" ]
 
-let loadingView t =
+let messageView t =
     div [ loadingStyle ] [ text t ]
 
 let mappedCharacterView =
@@ -148,12 +215,12 @@ let mappedFilmView =
 let view model =
     match model with
     | InitialScreen ->
-        loadingView "Loading amazing characters and films..."
+        messageView "Loading amazing characters and films..."
 
     | LoadingFilms ch ->
         div [ Style [ "display", "flex" ] ]
             [ mappedCharacterView ch
-              loadingView ("Loading " + ch.name + " films...") ]
+              messageView ("Loading " + ch.name + " films...") ]
 
     | FilmsFromCharacter (ch, fs) ->
         let filmsView = List.map mappedFilmView fs
@@ -164,13 +231,16 @@ let view model =
     | LoadingCharacters f ->
         div [ Style [ "display", "flex" ] ]
             [ mappedFilmView f
-              loadingView ("Loading " + f.title + " characters...") ]
+              messageView ("Loading " + f.title + " characters...") ]
 
     | CharactersFromFilm (f, chs) ->
         let chsView = List.map mappedCharacterView chs
         div [ Style [ "display", "flex" ] ]
             [ mappedFilmView f
               div [] chsView ]
+
+    | ErrorScreen ->
+        messageView "An error ocurred. Please refresh the page and try again - and may the Force be with you!"
 
 // APP
 
