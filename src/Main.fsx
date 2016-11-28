@@ -17,12 +17,15 @@ open Fable.Arch.App.AppApi
 
 // ---------------------------------------------------------------------------
 
+// in F# code needs to be in sequential order of dependence
+
 module Film =
     type Model =
         { title: string
           episodeId: int
           characters: string list }
 
+    // to work like encoders / decoders
     type ModelJSON =
         { title: string
           episode_id: int
@@ -36,7 +39,7 @@ module Film =
                   characters = obj.characters }
         with _ -> None
 
-
+    // remember: code is compiled ir order, that's why styling comes first
     let mainStyle =
         Style
             [ "background-color", "rgba(52, 152, 219,1.0)"
@@ -89,7 +92,6 @@ module Character =
               "margin", "20px 0px 0px 20px"
               "cursor", "pointer" ]
 
-
     let nameStyle =
         Style
             [ "padding", "20px"
@@ -113,15 +115,6 @@ type Model =
     | CharactersFromFilm of Film.Model * Character.Model list
     | ErrorScreen
 
-let initChar:Character.Model =
-    { name = "Personagem"
-      films = ["as"; "df"; "gh"; "jk"] }
-
-let initFilm:Film.Model =
-    { title = "Filme"
-      episodeId = 7
-      characters = ["as"; "df"; "gh"; "jk"] }
-
 // UPDATE
 
 type Msg
@@ -130,6 +123,8 @@ type Msg
     | LoadFilms of Character.Model
     | ToFilmsFromCharacter of Character.Model * Film.Model list
     | FetchFail
+
+// fetch feels much more like JS then Elm - transpiled language side effect
 
 let fetchEntity url jsonFn parseFn =
     promise {
@@ -184,6 +179,7 @@ let getFilms (character: Character.Model) handler =
             >> handler )
         |> ignore
 
+// model + list of callbacks
 let update model msg =
     match msg with
     | LoadCharacters f -> LoadingCharacters f , [ getCharacters f ]
@@ -206,6 +202,7 @@ let loadingStyle =
 let messageView t =
     div [ loadingStyle ] [ text t ]
 
+// Html.App.map, same thing:
 let mappedCharacterView =
     Character.view >> Html.map LoadFilms
 
@@ -243,6 +240,8 @@ let view model =
         messageView "An error ocurred. Please refresh the page and try again - and may the Force be with you!"
 
 // APP
+
+// remember withInitMessage:
 
 createApp InitialScreen view update Virtualdom.createRender
 |> withStartNodeSelector "#app"
