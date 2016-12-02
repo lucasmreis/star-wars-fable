@@ -800,13 +800,13 @@ extsprintf@1.0.2:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/extsprintf/-/extsprintf-1.0.2.tgz#e1080e0658e300b06294990cc70e1502235fd550"
 
-fable-arch@^0.9.12:
+fable-arch@0.9.12:
   version "0.9.12"
   resolved "https://registry.yarnpkg.com/fable-arch/-/fable-arch-0.9.12.tgz#bf23bccf62d186035cc74312d97a576ed76e5f86"
 
-fable-compiler@^0.7.8:
-  version "0.7.9"
-  resolved "https://registry.yarnpkg.com/fable-compiler/-/fable-compiler-0.7.9.tgz#18870310f49499d9c3eb435d1f1b07e8365c5edd"
+fable-compiler@0.7.17:
+  version "0.7.17"
+  resolved "https://registry.yarnpkg.com/fable-compiler/-/fable-compiler-0.7.17.tgz#f6a1e98dc14cc90a9d52c605e844dd5d70ca88c6"
   dependencies:
     babel-core "^6.18.2"
     babel-dts-generator "^0.6.2"
@@ -825,17 +825,17 @@ fable-compiler@^0.7.8:
     rollup-plugin-node-resolve "^2.0.0"
     semver "^5.3.0"
 
-fable-core@^0.7.8:
-  version "0.7.9"
-  resolved "https://registry.yarnpkg.com/fable-core/-/fable-core-0.7.9.tgz#e149518530d77ba9696f54b03488b2304d1e766e"
+fable-core@0.7.12:
+  version "0.7.12"
+  resolved "https://registry.yarnpkg.com/fable-core/-/fable-core-0.7.12.tgz#6ca5fbbafc69afc94623c46208a41cfd0d5b610b"
 
-fable-import-virtualdom@^0.8.1:
+fable-import-virtualdom@0.8.1:
   version "0.8.1"
   resolved "https://registry.yarnpkg.com/fable-import-virtualdom/-/fable-import-virtualdom-0.8.1.tgz#9af0a4c666eb11c48d3d48cb6507ff558221408e"
 
-fable-powerpack@0.0.14:
-  version "0.0.14"
-  resolved "https://registry.yarnpkg.com/fable-powerpack/-/fable-powerpack-0.0.14.tgz#15d0d20e4ae7ef653304798234b2864a00fdf7d4"
+fable-powerpack@0.0.18:
+  version "0.0.18"
+  resolved "https://registry.yarnpkg.com/fable-powerpack/-/fable-powerpack-0.0.18.tgz#826d9affdbf578b1a278b60d22094f25541ded9f"
 
 feature-detect-es6@^1.3.1:
   version "1.3.1"
@@ -1189,8 +1189,8 @@ json-stringify-safe@~5.0.1:
   resolved "https://registry.yarnpkg.com/json-stringify-safe/-/json-stringify-safe-5.0.1.tgz#1296a2d58fd45f19a0f6ce01d65701e2c735b6eb"
 
 json5@^0.5.0:
-  version "0.5.0"
-  resolved "https://registry.yarnpkg.com/json5/-/json5-0.5.0.tgz#9b20715b026cbe3778fd769edccd822d8332a5b2"
+  version "0.5.1"
+  resolved "https://registry.yarnpkg.com/json5/-/json5-0.5.1.tgz#1eade7acc012034ad84e2396767ead9fa5495821"
 
 jsonpointer@^4.0.0:
   version "4.0.0"
@@ -1297,14 +1297,14 @@ next-tick@^0.2.2:
   resolved "https://registry.yarnpkg.com/next-tick/-/next-tick-0.2.2.tgz#75da4a927ee5887e39065880065b7336413b310d"
 
 node-pre-gyp@^0.6.29:
-  version "0.6.31"
-  resolved "https://registry.yarnpkg.com/node-pre-gyp/-/node-pre-gyp-0.6.31.tgz#d8a00ddaa301a940615dbcc8caad4024d58f6017"
+  version "0.6.32"
+  resolved "https://registry.yarnpkg.com/node-pre-gyp/-/node-pre-gyp-0.6.32.tgz#fc452b376e7319b3d255f5f34853ef6fd8fe1fd5"
   dependencies:
     mkdirp "~0.5.1"
     nopt "~3.0.6"
-    npmlog "^4.0.0"
+    npmlog "^4.0.1"
     rc "~1.1.6"
-    request "^2.75.0"
+    request "^2.79.0"
     rimraf "~2.5.4"
     semver "~5.3.0"
     tar "~2.2.1"
@@ -1320,7 +1320,7 @@ normalize-path@^2.0.1:
   version "2.0.1"
   resolved "https://registry.yarnpkg.com/normalize-path/-/normalize-path-2.0.1.tgz#47886ac1662760d4261b7d979d241709d3ce3f7a"
 
-npmlog@^4.0.0:
+npmlog@^4.0.1:
   version "4.0.1"
   resolved "https://registry.yarnpkg.com/npmlog/-/npmlog-4.0.1.tgz#d14f503b4cd79710375553004ba96e6662fbc0b8"
   dependencies:
@@ -1505,7 +1505,7 @@ repeating@^2.0.0:
   dependencies:
     is-finite "^1.0.0"
 
-request@^2.75.0:
+request@^2.79.0:
   version "2.79.0"
   resolved "https://registry.yarnpkg.com/request/-/request-2.79.0.tgz#4dfe5bf6be8b8cdc37fcf93e04b65577722710de"
   dependencies:
@@ -1743,8 +1743,8 @@ util-deprecate@~1.0.1:
   resolved "https://registry.yarnpkg.com/util-deprecate/-/util-deprecate-1.0.2.tgz#450d4dc9fa70de732762fbd2d4a28981419a0ccf"
 
 uuid@^3.0.0:
-  version "3.0.0"
-  resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.0.0.tgz#6728fc0459c450d796a99c31837569bdf672d728"
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.0.1.tgz#6544bba2dfda8c1cf17e629a3a305e2bb1fee6c1"
 
 verror@1.3.6:
   version "1.3.6"
@@ -1752,7 +1752,7 @@ verror@1.3.6:
   dependencies:
     extsprintf "1.0.2"
 
-virtual-dom@^2.1.1:
+virtual-dom@2.1.1:
   version "2.1.1"
   resolved "https://registry.yarnpkg.com/virtual-dom/-/virtual-dom-2.1.1.tgz#80eda2d481b9ede0c049118cefcb4a05f21d1375"
   dependencies:

@@ -10,11 +10,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "fable-arch": "^0.9.12",
-    "fable-compiler": "^0.7.8",
-    "fable-core": "^0.7.8",
-    "fable-import-virtualdom": "^0.8.1",
-    "fable-powerpack": "0.0.14",
-    "virtual-dom": "^2.1.1"
+    "fable-arch": "0.9.12",
+    "fable-compiler": "0.7.17",
+    "fable-core": "0.7.12",
+    "fable-import-virtualdom": "0.8.1",
+    "fable-powerpack": "0.0.18",
+    "virtual-dom": "2.1.1"
   }
 }

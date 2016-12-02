@@ -5,192 +5,136 @@
 #load "../node_modules/fable-arch/Fable.Arch.Virtualdom.fs"
 
 open System
-open Fable.Import.Browser
+
+open Fable.Core
 open Fable.Core.JsInterop
+
+open Fable.Import
+open Fable.Import.Browser
 
 open Fable.PowerPack
 open Fable.PowerPack.Fetch
+open Fable.PowerPack.Result
 
 open Fable.Arch
 open Fable.Arch.Html
 open Fable.Arch.App.AppApi
 
-// ---------------------------------------------------------------------------
-
-// in F# code needs to be in sequential order of dependence
-
-module Film =
-    type Model =
-        { title: string
-          episodeId: int
-          characters: string list }
-
-    // to work like encoders / decoders
-    type ModelJSON =
-        { title: string
-          episode_id: int
-          characters: string list }
-
-    let parse (obj:ModelJSON) =
-        try
-            Some
-                { title = obj.title
-                  episodeId = obj.episode_id
-                  characters = obj.characters }
-        with _ -> None
-
-    // remember: code is compiled ir order, that's why styling comes first
-    let mainStyle =
-        Style
-            [ "background-color", "rgba(52, 152, 219,1.0)"
-              "width", "200px"
-              "height", "200px"
-              "color", "white"
-              "font-family", "-apple-system, system, sans-serif"
-              "margin", "20px 0px 0px 20px"
-              "cursor", "pointer" ]
-
-    let nameStyle =
-        Style
-            [ "padding", "20px"
-              "font-size", "18px" ]
-
-    let numberStyle =
-        Style
-            [ "padding", "20px 20px 0px 20px"
-              "font-size", "60px" ]
-
-    let view model =
-        div
-            [ mainStyle ; onMouseClick (fun _ -> model) ]
-            [ div [ numberStyle ] [ text (model.episodeId.ToString()) ]
-              div [ nameStyle ] [ text model.title ] ]
-
-// ---------------------------------------------------------------------------
-
-module Character =
-    type Model =
-        { name: string
-          films: string list }
-
-    type ModelJSON = Model
-
-    let parse (obj:ModelJSON):Model option =
-        try
-            Some
-                { name = obj.name
-                  films = obj.films }
-        with _ -> None
-
-    let mainStyle =
-        Style
-            [ "background-color", "rgba(230, 126, 34,1.0)"
-              "width", "200px"
-              "height", "200px"
-              "color", "white"
-              "font-family", "-apple-system, system, sans-serif"
-              "margin", "20px 0px 0px 20px"
-              "cursor", "pointer" ]
-
-    let nameStyle =
-        Style
-            [ "padding", "20px"
-              "font-size", "18px" ]
-
-    let view model =
-        div
-            [ mainStyle ; onMouseClick (fun _ -> model) ]
-            [ div [ nameStyle ] [ text model.name ] ]
-
-
-// ---------------------------------------------------------------------------
-// MAIN
+// -----------------------------------------------------------------------------------
+// MODEL
 //
+
+type Url = string
+
+type Details =
+    | Character of name: string
+    | Film of title: string * episode: string
+
+type Entity =
+    { related : Url list
+      details : Details }
 
 type Model =
     | InitialScreen
-    | LoadingFilms of Character.Model
-    | LoadingCharacters of Film.Model
-    | FilmsFromCharacter of Character.Model * Film.Model list
-    | CharactersFromFilm of Film.Model * Character.Model list
+    | Loading of Entity
+    | List of Entity * Entity list
     | ErrorScreen
 
+type ResponseJson =
+    { name : string
+      title : string
+      episode_id : string
+      characters : string list
+      films : string list }
+
+let parse json =
+    let obj = ofJson<ResponseJson> json
+    if String.IsNullOrEmpty obj.name then
+        { related = obj.characters
+          details = Film ( obj.title , obj.episode_id ) }
+    else
+        { related = obj.films
+          details = Character obj.name }
+
+// -----------------------------------------------------------------------------------
 // UPDATE
+//
 
 type Msg
-    = LoadCharacters of Film.Model
-    | ToCharactersFromFilm of Film.Model * Character.Model list
-    | LoadFilms of Character.Model
-    | ToFilmsFromCharacter of Character.Model * Film.Model list
+    = Load of Entity
+    | ToList of Entity * Entity list
     | FetchFail
 
-// fetch feels much more like JS then Elm - transpiled language side effect
-
-let fetchEntity url jsonFn parseFn =
+let fetchEntity (url:Url) =
     promise {
-        let! response = fetch(url, [])
-        let! body = if response.Ok then response.text() else failwith "http error"
-        let json = jsonFn(body)
-        return
-            match parseFn json with
-            | Some entity -> entity
-            | None -> failwith "json schema error" }
+        let! fetched = fetch url []
+        let! response = fetched.text()
+        return parse response }
 
-let getCharacter handler =
+let getFirstCharacter handler =
     promise {
-        try
-            let! character = fetchEntity "http://swapi.co/api/people/1/" ofJson<Character.ModelJSON> Character.parse
-            return LoadFilms character
-        with e ->
-            window.console.error("Fetch Error:", e)
-            return FetchFail }
+        let! entity = fetchEntity "http://swapi.co/api/people/2/"
+        return Load entity }
     |> Promise.map handler
     |> ignore
 
-let getCharacters (film: Film.Model) handler =
-    film.characters
-        |> List.map ( fun url -> promise {
-            try
-                let! character = fetchEntity url ofJson<Character.ModelJSON> Character.parse
-                return Some character
-            with e ->
-                return None } )
-        |> Promise.Parallel
-        |> Promise.map (
-            Array.choose id
-            >> Array.toList
-            >> fun chs -> ToCharactersFromFilm (film, chs)
-            >> handler )
-        |> ignore
+let getRelatedEntities (entity:Entity) handler =
+    List.map fetchEntity entity.related
+    |> Promise.Parallel
+    |> Promise.map ( fun list -> ToList ( entity , List.ofArray list ) )
+    |> Promise.map handler
+    |> ignore
 
-let getFilms (character: Character.Model) handler =
-    character.films
-        |> List.map ( fun url -> promise {
-            try
-                let! film = fetchEntity url ofJson<Film.ModelJSON> Film.parse
-                return Some film
-            with e ->
-                return None } )
-        |> Promise.Parallel
-        |> Promise.map (
-            Array.choose id
-            >> Array.toList
-            >> fun fs -> ToFilmsFromCharacter (character, fs)
-            >> handler )
-        |> ignore
-
-// model + list of callbacks
 let update model msg =
     match msg with
-    | LoadCharacters f -> LoadingCharacters f , [ getCharacters f ]
-    | ToCharactersFromFilm ( f , chs ) -> CharactersFromFilm ( f , chs ), []
-    | LoadFilms ch -> LoadingFilms ch , [ getFilms ch ]
-    | ToFilmsFromCharacter ( ch , fs ) -> FilmsFromCharacter ( ch , fs ), []
+    | Load entity -> Loading entity , [ getRelatedEntities entity ]
+    | ToList ( entity , list ) -> List ( entity , list ) , []
     | FetchFail -> ErrorScreen , []
 
+// -----------------------------------------------------------------------------------
 // VIEW
+//
 
-let loadingStyle =
+let bgColor entity =
+    match entity.details with
+    | Character _ -> "rgba(230, 126, 34,1.0)"
+    | Film _ -> "rgba(52, 152, 219,1.0)"
+
+let mainStyle entity =
+    Style
+        [ "background-color", bgColor entity
+          "width", "200px"
+          "height", "200px"
+          "color", "white"
+          "font-family", "-apple-system, system, sans-serif"
+          "margin", "20px 0px 0px 20px"
+          "cursor", "pointer" ]
+
+let filmNumberStyle =
+    Style
+        [ "padding", "20px 20px 0px 20px"
+          "font-size", "60px" ]
+
+let captionStyle =
+    Style
+        [ "padding", "20px"
+          "font-size", "18px" ]
+
+let filmContents title episode =
+    [ div [ filmNumberStyle ] [ text episode ]
+      div [ captionStyle ] [ text title ] ]
+
+let characterContents name = [ div [ captionStyle ] [ text name ] ]
+
+let entityView entity =
+    let attributes = [ mainStyle entity ; onMouseClick ( fun _ -> entity ) ]
+    let contents =
+        match entity.details with
+        | Film ( title , episode ) -> filmContents title episode
+        | Character name -> characterContents name
+    div attributes contents
+
+let messageStyle =
     Style
         [ "margin", "20px 0px 0px 20px"
           "width", "200px"
@@ -200,51 +144,36 @@ let loadingStyle =
           "font-size", "18px" ]
 
 let messageView t =
-    div [ loadingStyle ] [ text t ]
+    div [ messageStyle ] [ text t ]
 
-// Html.App.map, same thing:
-let mappedCharacterView =
-    Character.view >> Html.map LoadFilms
+let loadingMessageView entity =
+    match entity.details with
+    | Film ( title , _ ) -> messageView ("Loading " + title + " characters...")
+    | Character name -> messageView ("Loading " + name + " films...")
 
-let mappedFilmView =
-    Film.view >> Html.map LoadCharacters
+let mappedEntityView entity = Html.map Load ( entityView entity )
 
 let view model =
     match model with
     | InitialScreen ->
         messageView "Loading amazing characters and films..."
 
-    | LoadingFilms ch ->
+    | Loading entity ->
         div [ Style [ "display", "flex" ] ]
-            [ mappedCharacterView ch
-              messageView ("Loading " + ch.name + " films...") ]
+            [ mappedEntityView entity ; loadingMessageView entity ]
 
-    | FilmsFromCharacter (ch, fs) ->
-        let filmsView = List.map mappedFilmView fs
+    | List ( entity , list ) ->
+        let listView = List.map mappedEntityView list
         div [ Style [ "display", "flex" ] ]
-            [ mappedCharacterView ch
-              div [] filmsView ]
-
-    | LoadingCharacters f ->
-        div [ Style [ "display", "flex" ] ]
-            [ mappedFilmView f
-              messageView ("Loading " + f.title + " characters...") ]
-
-    | CharactersFromFilm (f, chs) ->
-        let chsView = List.map mappedCharacterView chs
-        div [ Style [ "display", "flex" ] ]
-            [ mappedFilmView f
-              div [] chsView ]
+            [ mappedEntityView entity ; div [] listView ]
 
     | ErrorScreen ->
         messageView "An error ocurred. Please refresh the page and try again - and may the Force be with you!"
 
 // APP
 
-// remember withInitMessage:
-
 createApp InitialScreen view update Virtualdom.createRender
 |> withStartNodeSelector "#app"
-|> withInitMessage getCharacter
+|> withInitMessage getFirstCharacter
 |> withSubscriber (fun x -> Fable.Import.Browser.console.log("Event received: ", x))
 |> start
