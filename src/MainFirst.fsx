@@ -4,20 +4,45 @@
 #load "../node_modules/fable-arch/Fable.Arch.App.fs"
 #load "../node_modules/fable-arch/Fable.Arch.Virtualdom.fs"
 
-open System
-open Fable.Import.Browser
 open Fable.Core.JsInterop
-
-open Fable.PowerPack
-open Fable.PowerPack.Fetch
 
 open Fable.Arch
 open Fable.Arch.Html
 open Fable.Arch.App.AppApi
 
-// ---------------------------------------------------------------------------
+open Fable.PowerPack
+open Fable.PowerPack.Fetch
 
-// in F# code needs to be in sequential order of dependence
+module Character =
+    type Model =
+        { name: string
+          films: string list }
+
+    let parse str =
+        try
+            let obj = ofJson<Model> str
+            Some obj
+        with _ -> None
+
+    let mainStyle =
+        Style
+            [ "background-color", "rgba(230, 126, 34,1.0)"
+              "width", "200px"
+              "height", "200px"
+              "color", "white"
+              "font-family", "-apple-system, system, sans-serif"
+              "margin", "20px 0px 0px 20px"
+              "cursor", "pointer" ]
+
+    let nameStyle =
+        Style
+            [ "padding", "20px"
+              "font-size", "18px" ]
+
+    let view model =
+        div
+            [ mainStyle ; onMouseClick (fun _ -> model) ]
+            [ div [ nameStyle ] [ text model.name ] ]
 
 module Film =
     type Model =
@@ -25,21 +50,20 @@ module Film =
           episodeId: int
           characters: string list }
 
-    // to work like encoders / decoders
     type ModelJSON =
         { title: string
           episode_id: int
           characters: string list }
 
-    let parse (obj:ModelJSON) =
+    let parse str =
         try
+            let obj = ofJson<ModelJSON> str
             Some
                 { title = obj.title
                   episodeId = obj.episode_id
                   characters = obj.characters }
         with _ -> None
 
-    // remember: code is compiled ir order, that's why styling comes first
     let mainStyle =
         Style
             [ "background-color", "rgba(52, 152, 219,1.0)"
@@ -66,47 +90,6 @@ module Film =
             [ div [ numberStyle ] [ text (model.episodeId.ToString()) ]
               div [ nameStyle ] [ text model.title ] ]
 
-// ---------------------------------------------------------------------------
-
-module Character =
-    type Model =
-        { name: string
-          films: string list }
-
-    type ModelJSON = Model
-
-    let parse (obj:ModelJSON):Model option =
-        try
-            Some
-                { name = obj.name
-                  films = obj.films }
-        with _ -> None
-
-    let mainStyle =
-        Style
-            [ "background-color", "rgba(230, 126, 34,1.0)"
-              "width", "200px"
-              "height", "200px"
-              "color", "white"
-              "font-family", "-apple-system, system, sans-serif"
-              "margin", "20px 0px 0px 20px"
-              "cursor", "pointer" ]
-
-    let nameStyle =
-        Style
-            [ "padding", "20px"
-              "font-size", "18px" ]
-
-    let view model =
-        div
-            [ mainStyle ; onMouseClick (fun _ -> model) ]
-            [ div [ nameStyle ] [ text model.name ] ]
-
-
-// ---------------------------------------------------------------------------
-// MAIN
-//
-
 type Model =
     | InitialScreen
     | LoadingFilms of Character.Model
@@ -115,34 +98,28 @@ type Model =
     | CharactersFromFilm of Film.Model * Character.Model list
     | ErrorScreen
 
-// UPDATE
-
-type Msg
-    = LoadCharacters of Film.Model
+type Msg =
+    | LoadCharacters of Film.Model
     | ToCharactersFromFilm of Film.Model * Character.Model list
     | LoadFilms of Character.Model
     | ToFilmsFromCharacter of Character.Model * Film.Model list
     | FetchFail
 
-// fetch feels much more like JS then Elm - transpiled language side effect
-
-let fetchEntity url jsonFn parseFn =
+let fetchEntity url parser =
     promise {
-        let! response = fetch(url, [])
-        let! body = if response.Ok then response.text() else failwith "http error"
-        let json = jsonFn(body)
-        return
-            match parseFn json with
-            | Some entity -> entity
-            | None -> failwith "json schema error" }
+        let! fetched = fetch url []
+        let! response = fetched.text()
+        return response |> parser }
 
 let getCharacter handler =
     promise {
         try
-            let! character = fetchEntity "http://swapi.co/api/people/1/" ofJson<Character.ModelJSON> Character.parse
-            return LoadFilms character
+            let! character = fetchEntity "http://swapi.co/api/people/1/" Character.parse
+            return
+                match character with
+                | Some ch -> LoadFilms ch
+                | None -> FetchFail
         with e ->
-            window.console.error("Fetch Error:", e)
             return FetchFail }
     |> Promise.map handler
     |> ignore
@@ -151,8 +128,7 @@ let getCharacters (film: Film.Model) handler =
     film.characters
         |> List.map ( fun url -> promise {
             try
-                let! character = fetchEntity url ofJson<Character.ModelJSON> Character.parse
-                return Some character
+                return! fetchEntity url Character.parse
             with e ->
                 return None } )
         |> Promise.Parallel
@@ -167,8 +143,7 @@ let getFilms (character: Character.Model) handler =
     character.films
         |> List.map ( fun url -> promise {
             try
-                let! film = fetchEntity url ofJson<Film.ModelJSON> Film.parse
-                return Some film
+                return! fetchEntity url Film.parse
             with e ->
                 return None } )
         |> Promise.Parallel
@@ -179,18 +154,24 @@ let getFilms (character: Character.Model) handler =
             >> handler )
         |> ignore
 
-// model + list of callbacks
 let update model msg =
     match msg with
-    | LoadCharacters f -> LoadingCharacters f , [ getCharacters f ]
-    | ToCharactersFromFilm ( f , chs ) -> CharactersFromFilm ( f , chs ), []
-    | LoadFilms ch -> LoadingFilms ch , [ getFilms ch ]
-    | ToFilmsFromCharacter ( ch , fs ) -> FilmsFromCharacter ( ch , fs ), []
-    | FetchFail -> ErrorScreen , []
+    | LoadCharacters f ->
+        LoadingCharacters f , [ getCharacters f ]
 
-// VIEW
+    | ToCharactersFromFilm ( f , chs ) ->
+        CharactersFromFilm ( f , chs ), []
 
-let loadingStyle =
+    | LoadFilms ch ->
+        LoadingFilms ch , [ getFilms ch ]
+
+    | ToFilmsFromCharacter ( ch , fs ) ->
+        FilmsFromCharacter ( ch , fs ), []
+
+    | FetchFail ->
+        ErrorScreen , []
+
+let messageStyle =
     Style
         [ "margin", "20px 0px 0px 20px"
           "width", "200px"
@@ -200,9 +181,8 @@ let loadingStyle =
           "font-size", "18px" ]
 
 let messageView t =
-    div [ loadingStyle ] [ text t ]
+    div [ messageStyle ] [ text t ]
 
-// Html.App.map, same thing:
 let mappedCharacterView =
     Character.view >> Html.map LoadFilms
 
@@ -239,12 +219,7 @@ let view model =
     | ErrorScreen ->
         messageView "An error ocurred. Please refresh the page and try again - and may the Force be with you!"
 
-// APP
-
-// remember withInitMessage:
-
 createApp InitialScreen view update Virtualdom.createRender
 |> withStartNodeSelector "#app"
 |> withInitMessage getCharacter
-|> withSubscriber (fun x -> Fable.Import.Browser.console.log("Event received: ", x))
 |> start
