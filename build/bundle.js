@@ -1794,6 +1794,11 @@ function padLeft(str, len, ch, isRight) {
     }return str;
 }
 
+
+function replace$$1(str, search, replace$$1) {
+    return str.replace(new RegExp(escape(search), "g"), replace$$1);
+}
+
 var _createClass$7 = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
 function _classCallCheck$7(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -5372,7 +5377,8 @@ setType("Main.Msg", Msg);
 function fetchEntity(url) {
     return function (builder_) {
         return builder_.Delay(function () {
-            return _fetch(url, {}).then(function (_arg1) {
+            var urlWithoutProtocol = replace$$1(url, "http://", "//");
+            return _fetch(urlWithoutProtocol, {}).then(function (_arg1) {
                 return _arg1.text().then(function (_arg2) {
                     return Promise.resolve(parse(_arg2));
                 });
@@ -5385,7 +5391,7 @@ function getFirstCharacter(handler) {
         return pr.then(handler);
     })(function (builder_) {
         return builder_.Delay(function () {
-            return fetchEntity("//swapi.co/api/people/2/").then(function (_arg1) {
+            return fetchEntity("http://swapi.co/api/people/2/").then(function (_arg1) {
                 return Promise.resolve(new Msg("Load", [_arg1]));
             });
         });

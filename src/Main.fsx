@@ -67,13 +67,15 @@ type Msg
 
 let fetchEntity (url:Url) =
     promise {
-        let! fetched = fetch url []
+        // suddenly gh-pages is https; so I'm just adjusting the API URLs here not to have CORS problems:
+        let urlWithoutProtocol = url.Replace("http://", "//")
+        let! fetched = fetch urlWithoutProtocol []
         let! response = fetched.text()
         return parse response }
 
 let getFirstCharacter handler =
     promise {
-        let! entity = fetchEntity "//swapi.co/api/people/2/"
+        let! entity = fetchEntity "http://swapi.co/api/people/2/"
         return Load entity }
     |> Promise.map handler
     |> ignore
