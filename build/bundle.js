@@ -5385,7 +5385,7 @@ function getFirstCharacter(handler) {
         return pr.then(handler);
     })(function (builder_) {
         return builder_.Delay(function () {
-            return fetchEntity("http://swapi.co/api/people/2/").then(function (_arg1) {
+            return fetchEntity("//swapi.co/api/people/2/").then(function (_arg1) {
                 return Promise.resolve(new Msg("Load", [_arg1]));
             });
         });

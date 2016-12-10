@@ -73,7 +73,7 @@ let fetchEntity (url:Url) =
 
 let getFirstCharacter handler =
     promise {
-        let! entity = fetchEntity "http://swapi.co/api/people/2/"
+        let! entity = fetchEntity "//swapi.co/api/people/2/"
         return Load entity }
     |> Promise.map handler
     |> ignore
