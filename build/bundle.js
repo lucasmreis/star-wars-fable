@@ -1,11 +1,6 @@
 (function (exports) {
 'use strict';
 
-var getEntity$1 = function getEntity$1(url) {
-  console.log('GET:', url);
-  return url;
-};
-
 var fableGlobal = function () {
     var globalObj = typeof window !== "undefined" ? window : typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : null;
     if (typeof globalObj.__FABLE_CORE__ === "undefined") {
@@ -1445,6 +1440,48 @@ function resolveGeneric(idx, enclosing) {
 }
 
 // TODO: This needs improvement, check namespace for non-custom types?
+function getTypeFullName(typ, option) {
+    function trim(fullName, option) {
+        if (typeof fullName !== "string") {
+            return "unknown";
+        }
+        if (option === "name") {
+            var i = fullName.lastIndexOf('.');
+            return fullName.substr(i + 1);
+        }
+        if (option === "namespace") {
+            var _i = fullName.lastIndexOf('.');
+            return _i > -1 ? fullName.substr(0, _i) : "";
+        }
+        return fullName;
+    }
+    if (typeof typ === "string") {
+        return typ;
+    } else if (typ instanceof NonDeclaredType) {
+        switch (typ.kind) {
+            case "Unit":
+                return "unit";
+            case "Option":
+                return getTypeFullName(typ.generics[0], option) + " option";
+            case "Array":
+                return getTypeFullName(typ.generics[0], option) + "[]";
+            case "Tuple":
+                return typ.generics.map(function (x) {
+                    return getTypeFullName(x, option);
+                }).join(" * ");
+            case "GenericParam":
+            case "Interface":
+                return typ.name;
+            case "Any":
+            default:
+                return "unknown";
+        }
+    } else {
+        // Attention: this doesn't work with Object.getPrototypeOf
+        var proto = typ.prototype;
+        return trim(typeof proto[_Symbol.reflection] === "function" ? proto[_Symbol.reflection]().type : null, option);
+    }
+}
 
 function fromTicks(ticks) {
     return ticks / 10000;
@@ -1509,177 +1546,6 @@ function year(d) {
     return __getValue(d, "FullYear");
 }
 
-var _typeof$1 = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
-
-function _defineProperty$2(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
-
-function toJson(o) {
-    return JSON.stringify(o, function (k, v) {
-        if (ArrayBuffer.isView(v)) {
-            return Array.from(v);
-        } else if (v != null && (typeof v === "undefined" ? "undefined" : _typeof$1(v)) === "object") {
-            var properties = typeof v[_Symbol.reflection] === "function" ? v[_Symbol.reflection]().properties : null;
-            if (v instanceof List$1 || v instanceof FSet || v instanceof Set) {
-                return Array.from(v);
-            } else if (v instanceof FMap || v instanceof Map) {
-                return fold(function (o, kv) {
-                    return o[toJson(kv[0])] = kv[1], o;
-                }, {}, v);
-            } else if (!hasInterface(v, "FSharpRecord") && properties) {
-                return fold(function (o, prop) {
-                    return o[prop] = v[prop], o;
-                }, {}, Object.getOwnPropertyNames(properties));
-            } else if (hasInterface(v, "FSharpUnion")) {
-                if (!v.Fields || !v.Fields.length) {
-                    return v.Case;
-                } else if (v.Fields.length === 1) {
-                    return _defineProperty$2({}, v.Case, v.Fields[0]);
-                } else {
-                    return _defineProperty$2({}, v.Case, v.Fields);
-                }
-            }
-        }
-        return v;
-    });
-}
-function inflate(val, typ) {
-    function needsInflate(enclosing) {
-        var typ = enclosing.head;
-        if (typeof typ === "string") {
-            return false;
-        }
-        if (typ instanceof NonDeclaredType) {
-            switch (typ.kind) {
-                case "Option":
-                case "Array":
-                    return needsInflate(new List$1(typ.generics[0], enclosing));
-                case "Tuple":
-                    return typ.generics.some(function (x) {
-                        return needsInflate(new List$1(x, enclosing));
-                    });
-                case "GenericParam":
-                    return needsInflate(resolveGeneric(typ.name, enclosing.tail));
-                default:
-                    return false;
-            }
-        }
-        return true;
-    }
-    function inflateArray(arr, enclosing) {
-        return Array.isArray(arr) && needsInflate(enclosing) ? arr.map(function (x) {
-            return inflate(x, enclosing);
-        }) : arr;
-    }
-    function inflateMap(obj, keyEnclosing, valEnclosing) {
-        var inflateKey = keyEnclosing.head !== "string";
-        var inflateVal = needsInflate(valEnclosing);
-        return Object.getOwnPropertyNames(obj).map(function (k) {
-            var key = inflateKey ? inflate(JSON.parse(k), keyEnclosing) : k;
-            var val = inflateVal ? inflate(obj[k], valEnclosing) : obj[k];
-            return [key, val];
-        });
-    }
-    var enclosing = null;
-    if (typ instanceof List$1) {
-        enclosing = typ;
-        typ = typ.head;
-    } else {
-        enclosing = new List$1(typ, new List$1());
-    }
-    if (val == null || typeof typ === "string") {
-        return val;
-    } else if (typ instanceof NonDeclaredType) {
-        switch (typ.kind) {
-            case "Unit":
-                return null;
-            case "Option":
-                return inflate(val, new List$1(typ.generics[0], enclosing));
-            case "Array":
-                return inflateArray(val, new List$1(typ.generics[0], enclosing));
-            case "Tuple":
-                return typ.generics.map(function (x, i) {
-                    return inflate(val[i], new List$1(x, enclosing));
-                });
-            case "GenericParam":
-                return inflate(val, resolveGeneric(typ.name, enclosing.tail));
-            // case "Interface": // case "Any":
-            default:
-                return val;
-        }
-    } else if (typeof typ === "function") {
-        var proto = typ.prototype;
-        if (typ === Date) {
-            return parse$1(val);
-        }
-        if (proto instanceof List$1) {
-            return ofArray(inflateArray(val, resolveGeneric(0, enclosing)));
-        }
-        if (proto instanceof FSet) {
-            return create$1(inflateArray(val, resolveGeneric(0, enclosing)));
-        }
-        if (proto instanceof Set) {
-            return new Set(inflateArray(val, resolveGeneric(0, enclosing)));
-        }
-        if (proto instanceof FMap) {
-            return create(inflateMap(val, resolveGeneric(0, enclosing), resolveGeneric(1, enclosing)));
-        }
-        if (proto instanceof Map) {
-            return new Map(inflateMap(val, resolveGeneric(0, enclosing), resolveGeneric(1, enclosing)));
-        }
-        // Union types
-        var info = typeof proto[_Symbol.reflection] === "function" ? proto[_Symbol.reflection]() : {};
-        if (info.cases) {
-            var u = { Fields: [] };
-            if (typeof val === "string") {
-                u.Case = val;
-            } else {
-                var caseName = Object.getOwnPropertyNames(val)[0];
-                var fieldTypes = info.cases[caseName];
-                var fields = fieldTypes.length > 1 ? val[caseName] : [val[caseName]];
-                u.Case = caseName;
-                for (var i = 0; i < fieldTypes.length; i++) {
-                    u.Fields.push(inflate(fields[i], new List$1(fieldTypes[i], enclosing)));
-                }
-            }
-            return Object.assign(new typ(), u);
-        }
-        if (info.properties) {
-            var properties = info.properties;
-            var _iteratorNormalCompletion = true;
-            var _didIteratorError = false;
-            var _iteratorError = undefined;
-
-            try {
-                for (var _iterator = Object.getOwnPropertyNames(properties)[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-                    var k = _step.value;
-
-                    val[k] = inflate(val[k], new List$1(properties[k], enclosing));
-                }
-            } catch (err) {
-                _didIteratorError = true;
-                _iteratorError = err;
-            } finally {
-                try {
-                    if (!_iteratorNormalCompletion && _iterator.return) {
-                        _iterator.return();
-                    }
-                } finally {
-                    if (_didIteratorError) {
-                        throw _iteratorError;
-                    }
-                }
-            }
-
-            return Object.assign(new typ(), val);
-        }
-        return val;
-    }
-    throw new Error("Unexpected type when deserializing JSON: " + typ);
-}
-function ofJson(json, genArgs) {
-    return inflate(JSON.parse(json), genArgs ? genArgs.T : null);
-}
-
 function create$4(pattern, options) {
     var flags = "g";
     flags += options & 1 ? "i" : "";
@@ -1709,6 +1575,9 @@ var _typeof$3 = typeof Symbol === "function" && typeof Symbol.iterator === "symb
 
 var fsFormatRegExp = /(^|[^%])%([0+ ]*)(-?\d+)?(?:\.(\d+))?(\w)/;
 var formatRegExp = /\{(\d+)(,-?\d+)?(?:\:(.+?))?\}/g;
+function toHex(value) {
+    return value < 0 ? "ff" + (16777215 - (Math.abs(value) - 1)).toString(16) : value.toString(16);
+}
 function fsFormat(str) {
     var _cont = void 0;
     function isObject(x) {
@@ -1743,6 +1612,12 @@ function fsFormat(str) {
                             return k + ": " + String(rep[k]);
                         }).join(", ") + "}";
                     }
+                    break;
+                case "x":
+                    rep = toHex(Number(rep));
+                    break;
+                case "X":
+                    rep = toHex(Number(rep)).toUpperCase();
                     break;
             }
             var plusPrefix = flags.indexOf("+") >= 0 && parseInt(rep) >= 0;
@@ -1781,9 +1656,7 @@ function fsFormat(str) {
 
 
 
-function isNullOrEmpty(str) {
-    return typeof str !== "string" || str.length == 0;
-}
+
 
 function join(delimiter, xs) {
     xs = typeof xs == "string" ? getRestParams(arguments, 1) : xs;
@@ -1802,6 +1675,211 @@ function padLeft(str, len, ch, isRight) {
 
 function replace$$1(str, search, replace$$1) {
     return str.replace(new RegExp(escape(search), "g"), replace$$1);
+}
+
+var _typeof$1 = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+function _defineProperty$2(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
+function toJson(o) {
+    return JSON.stringify(o, function (k, v) {
+        if (ArrayBuffer.isView(v)) {
+            return Array.from(v);
+        } else if (v != null && (typeof v === "undefined" ? "undefined" : _typeof$1(v)) === "object") {
+            var properties = typeof v[_Symbol.reflection] === "function" ? v[_Symbol.reflection]().properties : null;
+            if (v instanceof List$1 || v instanceof FSet || v instanceof Set) {
+                return Array.from(v);
+            } else if (v instanceof FMap || v instanceof Map) {
+                return fold(function (o, kv) {
+                    return o[toJson(kv[0])] = kv[1], o;
+                }, {}, v);
+            } else if (!hasInterface(v, "FSharpRecord") && properties) {
+                return fold(function (o, prop) {
+                    return o[prop] = v[prop], o;
+                }, {}, Object.getOwnPropertyNames(properties));
+            } else if (hasInterface(v, "FSharpUnion")) {
+                if (!v.Fields || !v.Fields.length) {
+                    return v.Case;
+                } else if (v.Fields.length === 1) {
+                    return _defineProperty$2({}, v.Case, v.Fields[0]);
+                } else {
+                    return _defineProperty$2({}, v.Case, v.Fields);
+                }
+            }
+        }
+        return v;
+    });
+}
+function combine(path1, path2) {
+    return typeof path2 === "number" ? path1 + "[" + path2 + "]" : (path1 ? path1 + "." : "") + path2;
+}
+function isNullable(typ) {
+    if (typeof typ === "string") {
+        return typ !== "boolean" && typ !== "number";
+    } else if (typ instanceof NonDeclaredType) {
+        return typ.kind !== "Array" && typ.kind !== "Tuple";
+    } else {
+        var info = typeof typ.prototype[_Symbol.reflection] === "function" ? typ.prototype[_Symbol.reflection]() : null;
+        return info ? info.nullable : true;
+    }
+}
+function invalidate(val, typ, path) {
+    throw new Error(fsFormat("%A", val) + " " + (path ? "(" + path + ")" : "") + " is not of type " + getTypeFullName(typ));
+}
+function inflate(val, typ, path) {
+    function needsInflate(enclosing) {
+        var typ = enclosing.head;
+        if (typeof typ === "string") {
+            return false;
+        }
+        if (typ instanceof NonDeclaredType) {
+            switch (typ.kind) {
+                case "Option":
+                case "Array":
+                    return needsInflate(new List$1(typ.generics[0], enclosing));
+                case "Tuple":
+                    return typ.generics.some(function (x) {
+                        return needsInflate(new List$1(x, enclosing));
+                    });
+                case "GenericParam":
+                    return needsInflate(resolveGeneric(typ.name, enclosing.tail));
+                default:
+                    return false;
+            }
+        }
+        return true;
+    }
+    function inflateArray(arr, enclosing, path) {
+        if (!Array.isArray) {
+            invalidate(arr, "array", path);
+        }
+        // TODO: Validate non-inflated elements
+        return needsInflate(enclosing) ? arr.map(function (x, i) {
+            return inflate(x, enclosing, combine(path, i));
+        }) : arr;
+    }
+    function inflateMap(obj, keyEnclosing, valEnclosing, path) {
+        var inflateKey = keyEnclosing.head !== "string";
+        var inflateVal = needsInflate(valEnclosing);
+        return Object.getOwnPropertyNames(obj).map(function (k) {
+            var key = inflateKey ? inflate(JSON.parse(k), keyEnclosing, combine(path, k)) : k;
+            var val = inflateVal ? inflate(obj[k], valEnclosing, combine(path, k)) : obj[k];
+            return [key, val];
+        });
+    }
+    var enclosing = null;
+    if (typ instanceof List$1) {
+        enclosing = typ;
+        typ = typ.head;
+    } else {
+        enclosing = new List$1(typ, new List$1());
+    }
+    if (val == null) {
+        if (!isNullable(typ)) {
+            invalidate(val, typ, path);
+        }
+        return val;
+    } else if (typeof typ === "string") {
+        if ((typ === "boolean" || typ === "number" || typ === "string") && (typeof val === "undefined" ? "undefined" : _typeof$1(val)) !== typ) {
+            invalidate(val, typ, path);
+        }
+        return val;
+    } else if (typ instanceof NonDeclaredType) {
+        switch (typ.kind) {
+            case "Unit":
+                return null;
+            case "Option":
+                return inflate(val, new List$1(typ.generics[0], enclosing), path);
+            case "Array":
+                return inflateArray(val, new List$1(typ.generics[0], enclosing), path);
+            case "Tuple":
+                return typ.generics.map(function (x, i) {
+                    return inflate(val[i], new List$1(x, enclosing), combine(path, i));
+                });
+            case "GenericParam":
+                return inflate(val, resolveGeneric(typ.name, enclosing.tail), path);
+            // case "Interface": // case "Any":
+            default:
+                return val;
+        }
+    } else if (typeof typ === "function") {
+        var proto = typ.prototype;
+        if (typ === Date) {
+            return parse$1(val);
+        }
+        if (proto instanceof List$1) {
+            return ofArray(inflateArray(val, resolveGeneric(0, enclosing), path));
+        }
+        if (proto instanceof FSet) {
+            return create$1(inflateArray(val, resolveGeneric(0, enclosing), path));
+        }
+        if (proto instanceof Set) {
+            return new Set(inflateArray(val, resolveGeneric(0, enclosing), path));
+        }
+        if (proto instanceof FMap) {
+            return create(inflateMap(val, resolveGeneric(0, enclosing), resolveGeneric(1, enclosing), path));
+        }
+        if (proto instanceof Map) {
+            return new Map(inflateMap(val, resolveGeneric(0, enclosing), resolveGeneric(1, enclosing), path));
+        }
+        var info = typeof proto[_Symbol.reflection] === "function" ? proto[_Symbol.reflection]() : {};
+        // Union types
+        if (info.cases) {
+            var u = { Fields: [] };
+            if (typeof val === "string") {
+                u.Case = val;
+            } else {
+                var caseName = Object.getOwnPropertyNames(val)[0];
+                var fieldTypes = info.cases[caseName];
+                if (Array.isArray(fieldTypes)) {
+                    var fields = fieldTypes.length > 1 ? val[caseName] : [val[caseName]];
+                    u.Case = caseName;
+                    path = combine(path, caseName);
+                    for (var i = 0; i < fieldTypes.length; i++) {
+                        u.Fields.push(inflate(fields[i], new List$1(fieldTypes[i], enclosing), combine(path, i)));
+                    }
+                }
+            }
+            if (u.Case in info.cases === false) {
+                invalidate(val, typ, path);
+            }
+            return Object.assign(new typ(), u);
+        }
+        if (info.properties) {
+            var properties = info.properties;
+            var _iteratorNormalCompletion = true;
+            var _didIteratorError = false;
+            var _iteratorError = undefined;
+
+            try {
+                for (var _iterator = Object.getOwnPropertyNames(properties)[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                    var k = _step.value;
+
+                    val[k] = inflate(val[k], new List$1(properties[k], enclosing), combine(path, k));
+                }
+            } catch (err) {
+                _didIteratorError = true;
+                _iteratorError = err;
+            } finally {
+                try {
+                    if (!_iteratorNormalCompletion && _iterator.return) {
+                        _iterator.return();
+                    }
+                } finally {
+                    if (_didIteratorError) {
+                        throw _iteratorError;
+                    }
+                }
+            }
+
+            return Object.assign(new typ(), val);
+        }
+        return val;
+    }
+    throw new Error("Unexpected type when deserializing JSON: " + typ);
+}
+function ofJson(json, genArgs) {
+    return inflate(JSON.parse(json), genArgs ? genArgs.T : null, "");
 }
 
 var _createClass$7 = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -2065,134 +2143,134 @@ var _createClass$8 = function () { function defineProperties(target, props) { fo
 function _classCallCheck$8(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var Types = function (__exports) {
-  var Attribute = __exports.Attribute = function () {
-    function Attribute(caseName, fields) {
-      _classCallCheck$8(this, Attribute);
+    var Attribute = __exports.Attribute = function () {
+        function Attribute(caseName, fields) {
+            _classCallCheck$8(this, Attribute);
 
-      this.Case = caseName;
-      this.Fields = fields;
-    }
+            this.Case = caseName;
+            this.Fields = fields;
+        }
 
-    _createClass$8(Attribute, [{
-      key: _Symbol.reflection,
-      value: function () {
-        return {
-          type: "Fable.Arch.Html.Types.Attribute",
-          interfaces: ["FSharpUnion"],
-          cases: {
-            Attribute: [Tuple(["string", "string"])],
-            EventHandler: [Tuple(["string", "function"])],
-            Property: [Tuple(["string", "string"])],
-            Style: [makeGeneric(List$1, {
-              T: Tuple(["string", "string"])
-            })]
-          }
-        };
-      }
-    }]);
+        _createClass$8(Attribute, [{
+            key: _Symbol.reflection,
+            value: function () {
+                return {
+                    type: "Fable.Arch.Html.Types.Attribute",
+                    interfaces: ["FSharpUnion"],
+                    cases: {
+                        Attribute: [Tuple(["string", "string"])],
+                        EventHandler: [Tuple(["string", "function"])],
+                        Property: [Tuple(["string", "string"])],
+                        Style: [makeGeneric(List$1, {
+                            T: Tuple(["string", "string"])
+                        })]
+                    }
+                };
+            }
+        }]);
 
-    return Attribute;
-  }();
+        return Attribute;
+    }();
 
-  setType("Fable.Arch.Html.Types.Attribute", Attribute);
+    setType("Fable.Arch.Html.Types.Attribute", Attribute);
 
-  var DomNode = __exports.DomNode = function () {
-    function DomNode(caseName, fields) {
-      _classCallCheck$8(this, DomNode);
+    var DomNode = __exports.DomNode = function () {
+        function DomNode(caseName, fields) {
+            _classCallCheck$8(this, DomNode);
 
-      this.Case = caseName;
-      this.Fields = fields;
-    }
+            this.Case = caseName;
+            this.Fields = fields;
+        }
 
-    _createClass$8(DomNode, [{
-      key: _Symbol.reflection,
-      value: function () {
-        return {
-          type: "Fable.Arch.Html.Types.DomNode",
-          interfaces: ["FSharpUnion"],
-          cases: {
-            Element: [Tuple(["string", makeGeneric(List$1, {
-              T: makeGeneric(Attribute, {
-                TMessage: GenericParam("TMessage")
-              })
-            })]), makeGeneric(List$1, {
-              T: makeGeneric(DomNode, {
-                TMessage: GenericParam("TMessage")
-              })
-            })],
-            Svg: [Tuple(["string", makeGeneric(List$1, {
-              T: makeGeneric(Attribute, {
-                TMessage: GenericParam("TMessage")
-              })
-            })]), makeGeneric(List$1, {
-              T: makeGeneric(DomNode, {
-                TMessage: GenericParam("TMessage")
-              })
-            })],
-            Text: ["string"],
-            VoidElement: [Tuple(["string", makeGeneric(List$1, {
-              T: makeGeneric(Attribute, {
-                TMessage: GenericParam("TMessage")
-              })
-            })])],
-            WhiteSpace: ["string"]
-          }
-        };
-      }
-    }]);
+        _createClass$8(DomNode, [{
+            key: _Symbol.reflection,
+            value: function () {
+                return {
+                    type: "Fable.Arch.Html.Types.DomNode",
+                    interfaces: ["FSharpUnion"],
+                    cases: {
+                        Element: [Tuple(["string", makeGeneric(List$1, {
+                            T: makeGeneric(Attribute, {
+                                TMessage: GenericParam("TMessage")
+                            })
+                        })]), makeGeneric(List$1, {
+                            T: makeGeneric(DomNode, {
+                                TMessage: GenericParam("TMessage")
+                            })
+                        })],
+                        Svg: [Tuple(["string", makeGeneric(List$1, {
+                            T: makeGeneric(Attribute, {
+                                TMessage: GenericParam("TMessage")
+                            })
+                        })]), makeGeneric(List$1, {
+                            T: makeGeneric(DomNode, {
+                                TMessage: GenericParam("TMessage")
+                            })
+                        })],
+                        Text: ["string"],
+                        VoidElement: [Tuple(["string", makeGeneric(List$1, {
+                            T: makeGeneric(Attribute, {
+                                TMessage: GenericParam("TMessage")
+                            })
+                        })])],
+                        WhiteSpace: ["string"]
+                    }
+                };
+            }
+        }]);
 
-    return DomNode;
-  }();
+        return DomNode;
+    }();
 
-  setType("Fable.Arch.Html.Types.DomNode", DomNode);
-  return __exports;
+    setType("Fable.Arch.Html.Types.DomNode", DomNode);
+    return __exports;
 }({});
 function mapEventHandler(mapping, e, f) {
-  return new Types.Attribute("EventHandler", [[e, function ($var1) {
-    return mapping(f($var1));
-  }]]);
+    return new Types.Attribute("EventHandler", [[e, function ($var1) {
+        return mapping(f($var1));
+    }]]);
 }
 function mapAttributes(mapping, attribute) {
-  return attribute.Case === "Style" ? new Types.Attribute("Style", [attribute.Fields[0]]) : attribute.Case === "Property" ? new Types.Attribute("Property", [attribute.Fields[0]]) : attribute.Case === "Attribute" ? new Types.Attribute("Attribute", [attribute.Fields[0]]) : mapEventHandler(mapping, attribute.Fields[0][0], attribute.Fields[0][1]);
+    return attribute.Case === "Style" ? new Types.Attribute("Style", [attribute.Fields[0]]) : attribute.Case === "Property" ? new Types.Attribute("Property", [attribute.Fields[0]]) : attribute.Case === "Attribute" ? new Types.Attribute("Attribute", [attribute.Fields[0]]) : mapEventHandler(mapping, attribute.Fields[0][0], attribute.Fields[0][1]);
 }
 function mapElem(mapping, node_0, node_1) {
-  var node = [node_0, node_1];
-  return [node[0], map$$1(function (attribute) {
-    return mapAttributes(mapping, attribute);
-  }, node[1])];
+    var node = [node_0, node_1];
+    return [node[0], map$$1(function (attribute) {
+        return mapAttributes(mapping, attribute);
+    }, node[1])];
 }
 function mapVoidElem(mapping, node_0, node_1) {
-  var node = [node_0, node_1];
-  return [node[0], map$$1(function (attribute) {
-    return mapAttributes(mapping, attribute);
-  }, node[1])];
+    var node = [node_0, node_1];
+    return [node[0], map$$1(function (attribute) {
+        return mapAttributes(mapping, attribute);
+    }, node[1])];
 }
 function map$5(mapping, node) {
-  return node.Case === "VoidElement" ? new Types.DomNode("VoidElement", [mapVoidElem(mapping, node.Fields[0][0], node.Fields[0][1])]) : node.Case === "Text" ? new Types.DomNode("Text", [node.Fields[0]]) : node.Case === "WhiteSpace" ? new Types.DomNode("WhiteSpace", [node.Fields[0]]) : node.Case === "Svg" ? new Types.DomNode("Element", [mapElem(mapping, node.Fields[0][0], node.Fields[0][1]), map$$1(function (node_1) {
-    return map$5(mapping, node_1);
-  }, node.Fields[1])]) : new Types.DomNode("Element", [mapElem(mapping, node.Fields[0][0], node.Fields[0][1]), map$$1(function (node_1) {
-    return map$5(mapping, node_1);
-  }, node.Fields[1])]);
+    return node.Case === "VoidElement" ? new Types.DomNode("VoidElement", [mapVoidElem(mapping, node.Fields[0][0], node.Fields[0][1])]) : node.Case === "Text" ? new Types.DomNode("Text", [node.Fields[0]]) : node.Case === "WhiteSpace" ? new Types.DomNode("WhiteSpace", [node.Fields[0]]) : node.Case === "Svg" ? new Types.DomNode("Element", [mapElem(mapping, node.Fields[0][0], node.Fields[0][1]), map$$1(function (node_1) {
+        return map$5(mapping, node_1);
+    }, node.Fields[1])]) : new Types.DomNode("Element", [mapElem(mapping, node.Fields[0][0], node.Fields[0][1]), map$$1(function (node_1) {
+        return map$5(mapping, node_1);
+    }, node.Fields[1])]);
 }
 var Attributes = function (__exports) {
-  var classBaseList = __exports.classBaseList = function (b, list) {
-    return new Types.Attribute("Attribute", [["class", fsFormat("%s %s")(function (x) {
-      return x;
-    })(b)(join(" ", map$1(function (tupledArg) {
-      return tupledArg[0];
-    }, filter$1(function (tupledArg) {
-      return tupledArg[1];
-    }, list))))]]);
-  };
+    var classBaseList = __exports.classBaseList = function (b, list) {
+        return new Types.Attribute("Attribute", [["class", fsFormat("%s %s")(function (x) {
+            return x;
+        })(b)(join(" ", map$1(function (tupledArg) {
+            return tupledArg[0];
+        }, filter$1(function (tupledArg) {
+            return tupledArg[1];
+        }, list))))]]);
+    };
 
-  return __exports;
+    return __exports;
 }({});
 var Svg = function (__exports) {
-  var svgNS = __exports.svgNS = function () {
-    return new Types.Attribute("Property", [["namespace", "http://www.w3.org/2000/svg"]]);
-  };
+    var svgNS = __exports.svgNS = function () {
+        return new Types.Attribute("Property", [["namespace", "http://www.w3.org/2000/svg"]]);
+    };
 
-  return __exports;
+    return __exports;
 }({});
 
 var _createClass$9 = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -2200,532 +2278,532 @@ var _createClass$9 = function () { function defineProperties(target, props) { fo
 function _classCallCheck$9(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var Types$1 = function (__exports) {
-  var ModelChanged = __exports.ModelChanged = function () {
-    function ModelChanged(previousState, message, currentState) {
-      _classCallCheck$9(this, ModelChanged);
+    var ModelChanged = __exports.ModelChanged = function () {
+        function ModelChanged(previousState, message, currentState) {
+            _classCallCheck$9(this, ModelChanged);
 
-      this.PreviousState = previousState;
-      this.Message = message;
-      this.CurrentState = currentState;
-    }
+            this.PreviousState = previousState;
+            this.Message = message;
+            this.CurrentState = currentState;
+        }
 
-    _createClass$9(ModelChanged, [{
-      key: _Symbol.reflection,
-      value: function () {
-        return {
-          type: "Fable.Arch.App.Types.ModelChanged",
-          interfaces: ["FSharpRecord", "System.IEquatable", "System.IComparable"],
-          properties: {
-            PreviousState: GenericParam("TModel"),
-            Message: GenericParam("TMessage"),
-            CurrentState: GenericParam("TModel")
-          }
+        _createClass$9(ModelChanged, [{
+            key: _Symbol.reflection,
+            value: function () {
+                return {
+                    type: "Fable.Arch.App.Types.ModelChanged",
+                    interfaces: ["FSharpRecord", "System.IEquatable", "System.IComparable"],
+                    properties: {
+                        PreviousState: GenericParam("TModel"),
+                        Message: GenericParam("TMessage"),
+                        CurrentState: GenericParam("TModel")
+                    }
+                };
+            }
+        }, {
+            key: "Equals",
+            value: function (other) {
+                return equalsRecords(this, other);
+            }
+        }, {
+            key: "CompareTo",
+            value: function (other) {
+                return compareRecords(this, other);
+            }
+        }]);
+
+        return ModelChanged;
+    }();
+
+    setType("Fable.Arch.App.Types.ModelChanged", ModelChanged);
+
+    var AppEvent = __exports.AppEvent = function () {
+        function AppEvent(caseName, fields) {
+            _classCallCheck$9(this, AppEvent);
+
+            this.Case = caseName;
+            this.Fields = fields;
+        }
+
+        _createClass$9(AppEvent, [{
+            key: _Symbol.reflection,
+            value: function () {
+                return {
+                    type: "Fable.Arch.App.Types.AppEvent",
+                    interfaces: ["FSharpUnion", "System.IEquatable", "System.IComparable"],
+                    cases: {
+                        ActionReceived: [GenericParam("TMessage")],
+                        ModelChanged: [makeGeneric(ModelChanged, {
+                            TMessage: GenericParam("TMessage"),
+                            TModel: GenericParam("TModel")
+                        })],
+                        Replayed: [makeGeneric(List$1, {
+                            T: Tuple(["string", GenericParam("TModel")])
+                        })]
+                    }
+                };
+            }
+        }, {
+            key: "Equals",
+            value: function (other) {
+                return equalsUnions(this, other);
+            }
+        }, {
+            key: "CompareTo",
+            value: function (other) {
+                return compareUnions(this, other);
+            }
+        }]);
+
+        return AppEvent;
+    }();
+
+    setType("Fable.Arch.App.Types.AppEvent", AppEvent);
+
+    var AppMessage = __exports.AppMessage = function () {
+        function AppMessage(caseName, fields) {
+            _classCallCheck$9(this, AppMessage);
+
+            this.Case = caseName;
+            this.Fields = fields;
+        }
+
+        _createClass$9(AppMessage, [{
+            key: _Symbol.reflection,
+            value: function () {
+                return {
+                    type: "Fable.Arch.App.Types.AppMessage",
+                    interfaces: ["FSharpUnion", "System.IEquatable", "System.IComparable"],
+                    cases: {
+                        Message: [GenericParam("TMessage")],
+                        Replay: [GenericParam("TModel"), makeGeneric(List$1, {
+                            T: Tuple(["string", GenericParam("TMessage")])
+                        })]
+                    }
+                };
+            }
+        }, {
+            key: "Equals",
+            value: function (other) {
+                return equalsUnions(this, other);
+            }
+        }, {
+            key: "CompareTo",
+            value: function (other) {
+                return compareUnions(this, other);
+            }
+        }]);
+
+        return AppMessage;
+    }();
+
+    setType("Fable.Arch.App.Types.AppMessage", AppMessage);
+
+    var Plugin = __exports.Plugin = function () {
+        function Plugin(producer, subscriber) {
+            _classCallCheck$9(this, Plugin);
+
+            this.Producer = producer;
+            this.Subscriber = subscriber;
+        }
+
+        _createClass$9(Plugin, [{
+            key: _Symbol.reflection,
+            value: function () {
+                return {
+                    type: "Fable.Arch.App.Types.Plugin",
+                    interfaces: ["FSharpRecord"],
+                    properties: {
+                        Producer: "function",
+                        Subscriber: "function"
+                    }
+                };
+            }
+        }]);
+
+        return Plugin;
+    }();
+
+    setType("Fable.Arch.App.Types.Plugin", Plugin);
+
+    var AppSpecification = __exports.AppSpecification = function () {
+        function AppSpecification(initState, view, update, initMessage, createRenderer, nodeSelector, producers, subscribers) {
+            _classCallCheck$9(this, AppSpecification);
+
+            this.InitState = initState;
+            this.View = view;
+            this.Update = update;
+            this.InitMessage = initMessage;
+            this.CreateRenderer = createRenderer;
+            this.NodeSelector = nodeSelector;
+            this.Producers = producers;
+            this.Subscribers = subscribers;
+        }
+
+        _createClass$9(AppSpecification, [{
+            key: _Symbol.reflection,
+            value: function () {
+                return {
+                    type: "Fable.Arch.App.Types.AppSpecification",
+                    interfaces: ["FSharpRecord"],
+                    properties: {
+                        InitState: GenericParam("TModel"),
+                        View: "function",
+                        Update: "function",
+                        InitMessage: "function",
+                        CreateRenderer: "function",
+                        NodeSelector: "string",
+                        Producers: makeGeneric(List$1, {
+                            T: "function"
+                        }),
+                        Subscribers: makeGeneric(List$1, {
+                            T: "function"
+                        })
+                    }
+                };
+            }
+        }]);
+
+        return AppSpecification;
+    }();
+
+    setType("Fable.Arch.App.Types.AppSpecification", AppSpecification);
+
+    var App = __exports.App = function () {
+        function App(model, actions, render, subscribers) {
+            _classCallCheck$9(this, App);
+
+            this.Model = model;
+            this.Actions = actions;
+            this.Render = render;
+            this.Subscribers = subscribers;
+        }
+
+        _createClass$9(App, [{
+            key: _Symbol.reflection,
+            value: function () {
+                return {
+                    type: "Fable.Arch.App.Types.App",
+                    interfaces: ["FSharpRecord"],
+                    properties: {
+                        Model: GenericParam("TModel"),
+                        Actions: makeGeneric(List$1, {
+                            T: "function"
+                        }),
+                        Render: "function",
+                        Subscribers: makeGeneric(List$1, {
+                            T: "function"
+                        })
+                    }
+                };
+            }
+        }]);
+
+        return App;
+    }();
+
+    setType("Fable.Arch.App.Types.App", App);
+
+    var application = __exports.application = function (initMessage, handleMessage, handleReplay, configureProducers, createInitApp) {
+        var state = null;
+
+        var notifySubs = function notifySubs(msg) {
+            if (state == null) {} else {
+                var s = state;
+                iterate(function (sub) {
+                    sub(msg);
+                }, s.Subscribers);
+            }
         };
-      }
-    }, {
-      key: "Equals",
-      value: function (other) {
-        return equalsRecords(this, other);
-      }
-    }, {
-      key: "CompareTo",
-      value: function (other) {
-        return compareRecords(this, other);
-      }
-    }]);
 
-    return ModelChanged;
-  }();
-
-  setType("Fable.Arch.App.Types.ModelChanged", ModelChanged);
-
-  var AppEvent = __exports.AppEvent = function () {
-    function AppEvent(caseName, fields) {
-      _classCallCheck$9(this, AppEvent);
-
-      this.Case = caseName;
-      this.Fields = fields;
-    }
-
-    _createClass$9(AppEvent, [{
-      key: _Symbol.reflection,
-      value: function () {
-        return {
-          type: "Fable.Arch.App.Types.AppEvent",
-          interfaces: ["FSharpUnion", "System.IEquatable", "System.IComparable"],
-          cases: {
-            ActionReceived: [GenericParam("TMessage")],
-            ModelChanged: [makeGeneric(ModelChanged, {
-              TMessage: GenericParam("TMessage"),
-              TModel: GenericParam("TModel")
-            })],
-            Replayed: [makeGeneric(List$1, {
-              T: Tuple(["string", GenericParam("TModel")])
-            })]
-          }
+        var handleEvent = function handleEvent(evt) {
+            var patternInput = evt.Case === "Replay" ? handleReplay(handleEvent)(notifySubs)([evt.Fields[0], evt.Fields[1]])(state) : handleMessage(handleEvent)(notifySubs)(evt.Fields[0])(state);
+            state = patternInput[0];
+            iterate(function (x) {
+                x();
+            }, patternInput[1]);
         };
-      }
-    }, {
-      key: "Equals",
-      value: function (other) {
-        return equalsUnions(this, other);
-      }
-    }, {
-      key: "CompareTo",
-      value: function (other) {
-        return compareUnions(this, other);
-      }
-    }]);
 
-    return AppEvent;
-  }();
-
-  setType("Fable.Arch.App.Types.AppEvent", AppEvent);
-
-  var AppMessage = __exports.AppMessage = function () {
-    function AppMessage(caseName, fields) {
-      _classCallCheck$9(this, AppMessage);
-
-      this.Case = caseName;
-      this.Fields = fields;
-    }
-
-    _createClass$9(AppMessage, [{
-      key: _Symbol.reflection,
-      value: function () {
-        return {
-          type: "Fable.Arch.App.Types.AppMessage",
-          interfaces: ["FSharpUnion", "System.IEquatable", "System.IComparable"],
-          cases: {
-            Message: [GenericParam("TMessage")],
-            Replay: [GenericParam("TModel"), makeGeneric(List$1, {
-              T: Tuple(["string", GenericParam("TMessage")])
-            })]
-          }
+        var post = function post($var2) {
+            return handleEvent(function (arg0) {
+                return new AppMessage("Message", [arg0]);
+            }($var2));
         };
-      }
-    }, {
-      key: "Equals",
-      value: function (other) {
-        return equalsUnions(this, other);
-      }
-    }, {
-      key: "CompareTo",
-      value: function (other) {
-        return compareUnions(this, other);
-      }
-    }]);
 
-    return AppMessage;
-  }();
-
-  setType("Fable.Arch.App.Types.AppMessage", AppMessage);
-
-  var Plugin = __exports.Plugin = function () {
-    function Plugin(producer, subscriber) {
-      _classCallCheck$9(this, Plugin);
-
-      this.Producer = producer;
-      this.Subscriber = subscriber;
-    }
-
-    _createClass$9(Plugin, [{
-      key: _Symbol.reflection,
-      value: function () {
-        return {
-          type: "Fable.Arch.App.Types.Plugin",
-          interfaces: ["FSharpRecord"],
-          properties: {
-            Producer: "function",
-            Subscriber: "function"
-          }
-        };
-      }
-    }]);
-
-    return Plugin;
-  }();
-
-  setType("Fable.Arch.App.Types.Plugin", Plugin);
-
-  var AppSpecification = __exports.AppSpecification = function () {
-    function AppSpecification(initState, view, update, initMessage, createRenderer, nodeSelector, producers, subscribers) {
-      _classCallCheck$9(this, AppSpecification);
-
-      this.InitState = initState;
-      this.View = view;
-      this.Update = update;
-      this.InitMessage = initMessage;
-      this.CreateRenderer = createRenderer;
-      this.NodeSelector = nodeSelector;
-      this.Producers = producers;
-      this.Subscribers = subscribers;
-    }
-
-    _createClass$9(AppSpecification, [{
-      key: _Symbol.reflection,
-      value: function () {
-        return {
-          type: "Fable.Arch.App.Types.AppSpecification",
-          interfaces: ["FSharpRecord"],
-          properties: {
-            InitState: GenericParam("TModel"),
-            View: "function",
-            Update: "function",
-            InitMessage: "function",
-            CreateRenderer: "function",
-            NodeSelector: "string",
-            Producers: makeGeneric(List$1, {
-              T: "function"
-            }),
-            Subscribers: makeGeneric(List$1, {
-              T: "function"
-            })
-          }
-        };
-      }
-    }]);
-
-    return AppSpecification;
-  }();
-
-  setType("Fable.Arch.App.Types.AppSpecification", AppSpecification);
-
-  var App = __exports.App = function () {
-    function App(model, actions, render, subscribers) {
-      _classCallCheck$9(this, App);
-
-      this.Model = model;
-      this.Actions = actions;
-      this.Render = render;
-      this.Subscribers = subscribers;
-    }
-
-    _createClass$9(App, [{
-      key: _Symbol.reflection,
-      value: function () {
-        return {
-          type: "Fable.Arch.App.Types.App",
-          interfaces: ["FSharpRecord"],
-          properties: {
-            Model: GenericParam("TModel"),
-            Actions: makeGeneric(List$1, {
-              T: "function"
-            }),
-            Render: "function",
-            Subscribers: makeGeneric(List$1, {
-              T: "function"
-            })
-          }
-        };
-      }
-    }]);
-
-    return App;
-  }();
-
-  setType("Fable.Arch.App.Types.App", App);
-
-  var application = __exports.application = function (initMessage, handleMessage, handleReplay, configureProducers, createInitApp) {
-    var state = null;
-
-    var notifySubs = function notifySubs(msg) {
-      if (state == null) {} else {
-        var s = state;
-        iterate(function (sub) {
-          sub(msg);
-        }, s.Subscribers);
-      }
+        state = createInitApp(post);
+        initMessage(post);
+        configureProducers(handleEvent);
+        return handleEvent;
     };
 
-    var handleEvent = function handleEvent(evt) {
-      var patternInput = evt.Case === "Replay" ? handleReplay(handleEvent)(notifySubs)([evt.Fields[0], evt.Fields[1]])(state) : handleMessage(handleEvent)(notifySubs)(evt.Fields[0])(state);
-      state = patternInput[0];
-      iterate(function (x) {
-        x();
-      }, patternInput[1]);
+    var render = __exports.render = function (post, viewFn, app) {
+        var view = viewFn(app.Model);
+        app.Render(function ($var3) {
+            return post(function (arg0) {
+                return new AppMessage("Message", [arg0]);
+            }($var3));
+        })(view);
+        return app;
     };
 
-    var post = function post($var2) {
-      return handleEvent(function (arg0) {
-        return new AppMessage("Message", [arg0]);
-      }($var2));
+    var createActions = __exports.createActions = function (post) {
+        var mapping = function mapping(a) {
+            return function () {
+                return a(function ($var4) {
+                    return post(function (arg0) {
+                        return new AppMessage("Message", [arg0]);
+                    }($var4));
+                });
+            };
+        };
+
+        return function (list) {
+            return map$$1(mapping, list);
+        };
     };
 
-    state = createInitApp(post);
-    initMessage(post);
-    configureProducers(handleEvent);
-    return handleEvent;
-  };
+    var handleMessage = __exports.handleMessage = function (update, viewFn, post, notifySubs, message, app) {
+        notifySubs(new AppEvent("ActionReceived", [message]));
+        var patternInput = update(app.Model)(message);
+        var modelChanged = new AppEvent("ModelChanged", [new ModelChanged(app.Model, message, patternInput[0])]);
+        var actions = createActions(post)(patternInput[1]);
 
-  var render = __exports.render = function (post, viewFn, app) {
-    var view = viewFn(app.Model);
-    app.Render(function ($var3) {
-      return post(function (arg0) {
-        return new AppMessage("Message", [arg0]);
-      }($var3));
-    })(view);
-    return app;
-  };
+        var app_ = function (app_1) {
+            return render(post, viewFn, app_1);
+        }(new App(patternInput[0], app.Actions, app.Render, app.Subscribers));
 
-  var createActions = __exports.createActions = function (post) {
-    var mapping = function mapping(a) {
-      return function () {
-        return a(function ($var4) {
-          return post(function (arg0) {
-            return new AppMessage("Message", [arg0]);
-          }($var4));
-        });
-      };
+        return [app_, new List$1(function () {
+            notifySubs(modelChanged);
+        }, actions)];
     };
 
-    return function (list) {
-      return map$$1(mapping, list);
-    };
-  };
+    var calculateModelChanges = __exports.calculateModelChanges = function (initState, update, actions) {
+        var execUpdate = function execUpdate(r) {
+            return function (a) {
+                var m = r.tail != null ? r.head[1] : initState;
+                var msg = a[1];
+                var patternInput = update(m)(a[1]);
+                var id = a[0];
+                return [id, patternInput[0]];
+            };
+        };
 
-  var handleMessage = __exports.handleMessage = function (update, viewFn, post, notifySubs, message, app) {
-    notifySubs(new AppEvent("ActionReceived", [message]));
-    var patternInput = update(app.Model)(message);
-    var modelChanged = new AppEvent("ModelChanged", [new ModelChanged(app.Model, message, patternInput[0])]);
-    var actions = createActions(post)(patternInput[1]);
-
-    var app_ = function (app_1) {
-      return render(post, viewFn, app_1);
-    }(new App(patternInput[0], app.Actions, app.Render, app.Subscribers));
-
-    return [app_, new List$1(function () {
-      notifySubs(modelChanged);
-    }, actions)];
-  };
-
-  var calculateModelChanges = __exports.calculateModelChanges = function (initState, update, actions) {
-    var execUpdate = function execUpdate(r) {
-      return function (a) {
-        var m = r.tail != null ? r.head[1] : initState;
-        var msg = a[1];
-        var patternInput = update(m)(a[1]);
-        var id = a[0];
-        return [id, patternInput[0]];
-      };
+        return fold(function (s, a) {
+            return new List$1(execUpdate(s)(a), s);
+        }, new List$1(), actions);
     };
 
-    return fold(function (s, a) {
-      return new List$1(execUpdate(s)(a), s);
-    }, new List$1(), actions);
-  };
+    var handleReplay = __exports.handleReplay = function (viewFn, updateFn, post, notifySubs, fromModel, actions, app) {
+        var result = calculateModelChanges(fromModel, updateFn, actions);
+        var model = result.tail == null ? fromModel : result.head[1];
 
-  var handleReplay = __exports.handleReplay = function (viewFn, updateFn, post, notifySubs, fromModel, actions, app) {
-    var result = calculateModelChanges(fromModel, updateFn, actions);
-    var model = result.tail == null ? fromModel : result.head[1];
+        var app_ = function (app_1) {
+            return render(post, viewFn, app_1);
+        }(new App(model, app.Actions, app.Render, app.Subscribers));
 
-    var app_ = function (app_1) {
-      return render(post, viewFn, app_1);
-    }(new App(model, app.Actions, app.Render, app.Subscribers));
+        return [app_, ofArray([function () {
+            return notifySubs(new AppEvent("Replayed", [result]));
+        }])];
+    };
 
-    return [app_, ofArray([function () {
-      return notifySubs(new AppEvent("Replayed", [result]));
-    }])];
-  };
-
-  return __exports;
+    return __exports;
 }({});
 var AppApi = function (__exports) {
-  var mapAction = __exports.mapAction = function (mapping, action, x) {
-    action(function ($var5) {
-      return x(mapping($var5));
-    });
-  };
-
-  var mapAppMessage = __exports.mapAppMessage = function (map$$2, _arg1) {
-    return _arg1.Case === "Replay" ? new Types$1.AppMessage("Replay", [_arg1.Fields[0], map$$1(function (tupledArg) {
-      return [tupledArg[0], map$$2(tupledArg[1])];
-    }, _arg1.Fields[1])]) : new Types$1.AppMessage("Message", [map$$2(_arg1.Fields[0])]);
-  };
-
-  var mapProducer = __exports.mapProducer = function (map$$2, p) {
-    return function (x) {
-      mapAction(map$$2, p, x);
+    var mapAction = __exports.mapAction = function (mapping, action, x) {
+        action(function ($var5) {
+            return x(mapping($var5));
+        });
     };
-  };
 
-  var mapSubscriber = __exports.mapSubscriber = function (mapModelChanged, mapAction_1, sub, _arg1) {
-    if (_arg1.Case === "ActionReceived") {
-      (function (option) {
-        iterate(sub, function () {
-          var $var6 = option;
+    var mapAppMessage = __exports.mapAppMessage = function (map$$2, _arg1) {
+        return _arg1.Case === "Replay" ? new Types$1.AppMessage("Replay", [_arg1.Fields[0], map$$1(function (tupledArg) {
+            return [tupledArg[0], map$$2(tupledArg[1])];
+        }, _arg1.Fields[1])]) : new Types$1.AppMessage("Message", [map$$2(_arg1.Fields[0])]);
+    };
 
-          if ($var6 != null) {
-            return [$var6];
-          } else {
-            return [];
-          }
-        }());
-      })(function () {
-        var $var7 = mapAction_1(function (x) {
-          return x;
-        })(_arg1.Fields[0]);
+    var mapProducer = __exports.mapProducer = function (map$$2, p) {
+        return function (x) {
+            mapAction(map$$2, p, x);
+        };
+    };
 
-        if ($var7 != null) {
-          return function (arg0) {
-            return new Types$1.AppEvent("ActionReceived", [arg0]);
-          }($var7);
+    var mapSubscriber = __exports.mapSubscriber = function (mapModelChanged, mapAction_1, sub, _arg1) {
+        if (_arg1.Case === "ActionReceived") {
+            (function (option) {
+                iterate(sub, function () {
+                    var $var6 = option;
+
+                    if ($var6 != null) {
+                        return [$var6];
+                    } else {
+                        return [];
+                    }
+                }());
+            })(function () {
+                var $var7 = mapAction_1(function (x) {
+                    return x;
+                })(_arg1.Fields[0]);
+
+                if ($var7 != null) {
+                    return function (arg0) {
+                        return new Types$1.AppEvent("ActionReceived", [arg0]);
+                    }($var7);
+                } else {
+                    return $var7;
+                }
+            }());
         } else {
-          return $var7;
-        }
-      }());
-    } else {
-      if (_arg1.Case === "Replayed") {
-        sub(new Types$1.AppEvent("Replayed", [_arg1.Fields[0]]));
-      } else {
-        (function (option) {
-          iterate(sub, function () {
-            var $var8 = option;
-
-            if ($var8 != null) {
-              return [$var8];
+            if (_arg1.Case === "Replayed") {
+                sub(new Types$1.AppEvent("Replayed", [_arg1.Fields[0]]));
             } else {
-              return [];
+                (function (option) {
+                    iterate(sub, function () {
+                        var $var8 = option;
+
+                        if ($var8 != null) {
+                            return [$var8];
+                        } else {
+                            return [];
+                        }
+                    }());
+                })(function () {
+                    var $var9 = mapModelChanged(_arg1.Fields[0]);
+
+                    if ($var9 != null) {
+                        return function (arg0) {
+                            return new Types$1.AppEvent("ModelChanged", [arg0]);
+                        }($var9);
+                    } else {
+                        return $var9;
+                    }
+                }());
             }
-          }());
-        })(function () {
-          var $var9 = mapModelChanged(_arg1.Fields[0]);
-
-          if ($var9 != null) {
-            return function (arg0) {
-              return new Types$1.AppEvent("ModelChanged", [arg0]);
-            }($var9);
-          } else {
-            return $var9;
-          }
-        }());
-      }
-    }
-  };
-
-  var mapActions = __exports.mapActions = function (m) {
-    var mapping = function mapping(action) {
-      return function (x) {
-        mapAction(m, action, x);
-      };
+        }
     };
 
-    return function (list) {
-      return map$$1(mapping, list);
-    };
-  };
-
-  var toActionList = __exports.toActionList = function (a) {
-    return ofArray([a]);
-  };
-
-  var createApp = __exports.createApp = function (state, view, update, createRenderer) {
-    return new Types$1.AppSpecification(state, view, update, function (_arg1) {}, createRenderer, "body", new List$1(), new List$1());
-  };
-
-  var createSimpleApp = __exports.createSimpleApp = function (model, view, update) {
-    var update_1 = function update_1(x) {
-      return function (y) {
-        return [update(x)(y), new List$1()];
-      };
-    };
-
-    return function (createRenderer) {
-      return createApp(model, view, update_1, createRenderer);
-    };
-  };
-
-  var withStartNodeSelector = __exports.withStartNodeSelector = function (selector, app) {
-    return new Types$1.AppSpecification(app.InitState, app.View, app.Update, app.InitMessage, app.CreateRenderer, selector, app.Producers, app.Subscribers);
-  };
-
-  var withInitMessage = __exports.withInitMessage = function (msg, app) {
-    return new Types$1.AppSpecification(app.InitState, app.View, app.Update, msg, app.CreateRenderer, app.NodeSelector, app.Producers, app.Subscribers);
-  };
-
-  var withInstrumentationProducer = function withInstrumentationProducer(p, app) {
-    var Producers = new List$1(p, app.Producers);
-    return new Types$1.AppSpecification(app.InitState, app.View, app.Update, app.InitMessage, app.CreateRenderer, app.NodeSelector, Producers, app.Subscribers);
-  };
-
-  var withProducer = __exports.withProducer = function (producer, app) {
-    var lift = function lift(h) {
-      return function ($var10) {
-        return h(function (arg0) {
-          return new Types$1.AppMessage("Message", [arg0]);
-        }($var10));
-      };
-    };
-
-    var producer_ = function producer_($var11) {
-      return producer(lift($var11));
-    };
-
-    return withInstrumentationProducer(producer_, app);
-  };
-
-  var withInstrumentationSubscriber = __exports.withInstrumentationSubscriber = function (subscriber, app) {
-    var Subscribers = new List$1(subscriber, app.Subscribers);
-    return new Types$1.AppSpecification(app.InitState, app.View, app.Update, app.InitMessage, app.CreateRenderer, app.NodeSelector, app.Producers, Subscribers);
-  };
-
-  var withSubscriber = __exports.withSubscriber = function (subscriber, app) {
-    var subscriber_ = function subscriber_(_arg1) {
-      if (_arg1.Case === "ModelChanged") {
-        subscriber(_arg1.Fields[0]);
-      }
-    };
-
-    return withInstrumentationSubscriber(subscriber_, app);
-  };
-
-  var withPlugin = __exports.withPlugin = function (plugin) {
-    return function ($var12) {
-      return withInstrumentationProducer(plugin.Producer, withInstrumentationSubscriber(plugin.Subscriber, $var12));
-    };
-  };
-
-  var configureProducers = __exports.configureProducers = function (producers, post) {
-    iterate(function (p) {
-      p(post);
-    }, producers);
-  };
-
-  var start = __exports.start = function (appSpec) {
-    var createInitApp = function createInitApp(post) {
-      var view = appSpec.View(appSpec.InitState);
-      var render = appSpec.CreateRenderer(appSpec.NodeSelector)(post)(view);
-      return new Types$1.App(appSpec.InitState, new List$1(), render, appSpec.Subscribers);
-    };
-
-    var handleMessage_ = function handleMessage_(post) {
-      return function (notifySubs) {
-        return function (message) {
-          return function (app) {
-            return Types$1.handleMessage(appSpec.Update, appSpec.View, post, notifySubs, message, app);
-          };
+    var mapActions = __exports.mapActions = function (m) {
+        var mapping = function mapping(action) {
+            return function (x) {
+                mapAction(m, action, x);
+            };
         };
-      };
-    };
 
-    var handleReplay_ = function handleReplay_(post) {
-      return function (notifySubs) {
-        return function (tupledArg) {
-          return function (app) {
-            return Types$1.handleReplay(appSpec.View, appSpec.Update, post, notifySubs, tupledArg[0], tupledArg[1], app);
-          };
+        return function (list) {
+            return map$$1(mapping, list);
         };
-      };
     };
 
-    var configureProducers_ = function configureProducers_(post) {
-      configureProducers(appSpec.Producers, post);
+    var toActionList = __exports.toActionList = function (a) {
+        return ofArray([a]);
     };
 
-    return Types$1.application(appSpec.InitMessage, handleMessage_, handleReplay_, configureProducers_, createInitApp);
-  };
+    var createApp = __exports.createApp = function (state, view, update, createRenderer) {
+        return new Types$1.AppSpecification(state, view, update, function (_arg1) {}, createRenderer, "body", new List$1(), new List$1());
+    };
 
-  return __exports;
+    var createSimpleApp = __exports.createSimpleApp = function (model, view, update) {
+        var update_1 = function update_1(x) {
+            return function (y) {
+                return [update(x)(y), new List$1()];
+            };
+        };
+
+        return function (createRenderer) {
+            return createApp(model, view, update_1, createRenderer);
+        };
+    };
+
+    var withStartNodeSelector = __exports.withStartNodeSelector = function (selector, app) {
+        return new Types$1.AppSpecification(app.InitState, app.View, app.Update, app.InitMessage, app.CreateRenderer, selector, app.Producers, app.Subscribers);
+    };
+
+    var withInitMessage = __exports.withInitMessage = function (msg, app) {
+        return new Types$1.AppSpecification(app.InitState, app.View, app.Update, msg, app.CreateRenderer, app.NodeSelector, app.Producers, app.Subscribers);
+    };
+
+    var withInstrumentationProducer = function withInstrumentationProducer(p, app) {
+        var Producers = new List$1(p, app.Producers);
+        return new Types$1.AppSpecification(app.InitState, app.View, app.Update, app.InitMessage, app.CreateRenderer, app.NodeSelector, Producers, app.Subscribers);
+    };
+
+    var withProducer = __exports.withProducer = function (producer, app) {
+        var lift = function lift(h) {
+            return function ($var10) {
+                return h(function (arg0) {
+                    return new Types$1.AppMessage("Message", [arg0]);
+                }($var10));
+            };
+        };
+
+        var producer_ = function producer_($var11) {
+            return producer(lift($var11));
+        };
+
+        return withInstrumentationProducer(producer_, app);
+    };
+
+    var withInstrumentationSubscriber = __exports.withInstrumentationSubscriber = function (subscriber, app) {
+        var Subscribers = new List$1(subscriber, app.Subscribers);
+        return new Types$1.AppSpecification(app.InitState, app.View, app.Update, app.InitMessage, app.CreateRenderer, app.NodeSelector, app.Producers, Subscribers);
+    };
+
+    var withSubscriber = __exports.withSubscriber = function (subscriber, app) {
+        var subscriber_ = function subscriber_(_arg1) {
+            if (_arg1.Case === "ModelChanged") {
+                subscriber(_arg1.Fields[0]);
+            }
+        };
+
+        return withInstrumentationSubscriber(subscriber_, app);
+    };
+
+    var withPlugin = __exports.withPlugin = function (plugin) {
+        return function ($var12) {
+            return withInstrumentationProducer(plugin.Producer, withInstrumentationSubscriber(plugin.Subscriber, $var12));
+        };
+    };
+
+    var configureProducers = __exports.configureProducers = function (producers, post) {
+        iterate(function (p) {
+            p(post);
+        }, producers);
+    };
+
+    var start = __exports.start = function (appSpec) {
+        var createInitApp = function createInitApp(post) {
+            var view = appSpec.View(appSpec.InitState);
+            var render = appSpec.CreateRenderer(appSpec.NodeSelector)(post)(view);
+            return new Types$1.App(appSpec.InitState, new List$1(), render, appSpec.Subscribers);
+        };
+
+        var handleMessage_ = function handleMessage_(post) {
+            return function (notifySubs) {
+                return function (message) {
+                    return function (app) {
+                        return Types$1.handleMessage(appSpec.Update, appSpec.View, post, notifySubs, message, app);
+                    };
+                };
+            };
+        };
+
+        var handleReplay_ = function handleReplay_(post) {
+            return function (notifySubs) {
+                return function (tupledArg) {
+                    return function (app) {
+                        return Types$1.handleReplay(appSpec.View, appSpec.Update, post, notifySubs, tupledArg[0], tupledArg[1], app);
+                    };
+                };
+            };
+        };
+
+        var configureProducers_ = function configureProducers_(post) {
+            configureProducers(appSpec.Producers, post);
+        };
+
+        return Types$1.application(appSpec.InitMessage, handleMessage_, handleReplay_, configureProducers_, createInitApp);
+    };
+
+    return __exports;
 }({});
 
 var nativeIsArray = Array.isArray;
@@ -4973,571 +5051,600 @@ var _createClass$10 = function () { function defineProperties(target, props) { f
 function _classCallCheck$10(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 function createTree(handler, tag, attributes, children) {
-  var toAttrs = function toAttrs(attrs) {
-    var elAttributes = function (_arg2) {
-      return _arg2.tail == null ? null : ["attributes", createObj(_arg2)];
-    }(choose$$1(function (x) {
-      return x;
-    }, map$$1(function (_arg1) {
-      return _arg1.Case === "Attribute" ? function () {
-        var v = _arg1.Fields[0][1];
-        var k = _arg1.Fields[0][0];
-        return [k, v];
-      }() : null;
-    }, attrs)));
+    var toAttrs = function toAttrs(attrs) {
+        var elAttributes = function (_arg2) {
+            return _arg2.tail == null ? null : ["attributes", createObj(_arg2)];
+        }(choose$$1(function (x) {
+            return x;
+        }, map$$1(function (_arg1) {
+            return _arg1.Case === "Attribute" ? function () {
+                var v = _arg1.Fields[0][1];
+                var k = _arg1.Fields[0][0];
+                return [k, v];
+            }() : null;
+        }, attrs)));
 
-    var props = map$$1(function (_arg4) {
-      return _arg4.Case === "Style" ? ["style", createObj(_arg4.Fields[0])] : _arg4.Case === "Property" ? function () {
-        var v = _arg4.Fields[0][1];
-        var k = _arg4.Fields[0][0];
-        return [k, v];
-      }() : _arg4.Case === "EventHandler" ? function () {
-        var f = _arg4.Fields[0][1];
-        var ev = _arg4.Fields[0][0];
-        return [ev, function ($var13) {
-          return handler(f($var13));
-        }];
-      }() : function () {
-        throw new Error("Shouldn't happen");
-      }();
-    }, filter$$1(function (_arg3) {
-      return _arg3.Case === "Attribute" ? false : true;
-    }, attrs));
-    return createObj(elAttributes != null ? new List$1(elAttributes, props) : props);
-  };
+        var props = map$$1(function (_arg4) {
+            return _arg4.Case === "Style" ? ["style", createObj(_arg4.Fields[0])] : _arg4.Case === "Property" ? function () {
+                var v = _arg4.Fields[0][1];
+                var k = _arg4.Fields[0][0];
+                return [k, v];
+            }() : _arg4.Case === "EventHandler" ? function () {
+                var f = _arg4.Fields[0][1];
+                var ev = _arg4.Fields[0][0];
+                return [ev, function ($var13) {
+                    return handler(f($var13));
+                }];
+            }() : function () {
+                throw new Error("Shouldn't happen");
+            }();
+        }, filter$$1(function (_arg3) {
+            return _arg3.Case === "Attribute" ? false : true;
+        }, attrs));
+        return createObj(elAttributes != null ? new List$1(elAttributes, props) : props);
+    };
 
-  var elem = h(tag, toAttrs(attributes), Array.from(children));
-  return elem;
+    var elem = h(tag, toAttrs(attributes), Array.from(children));
+    return elem;
 }
 var RenderState = function () {
-  function RenderState(caseName, fields) {
-    _classCallCheck$10(this, RenderState);
+    function RenderState(caseName, fields) {
+        _classCallCheck$10(this, RenderState);
 
-    this.Case = caseName;
-    this.Fields = fields;
-  }
+        this.Case = caseName;
+        this.Fields = fields;
+    }
 
-  _createClass$10(RenderState, [{
-    key: _Symbol.reflection,
-    value: function () {
-      return {
-        type: "Fable.Arch.Virtualdom.RenderState",
-        interfaces: ["FSharpUnion", "System.IEquatable", "System.IComparable"],
-        cases: {
-          ExtraRequest: [],
-          NoRequest: [],
-          PendingRequest: []
+    _createClass$10(RenderState, [{
+        key: _Symbol.reflection,
+        value: function () {
+            return {
+                type: "Fable.Arch.Virtualdom.RenderState",
+                interfaces: ["FSharpUnion", "System.IEquatable", "System.IComparable"],
+                cases: {
+                    ExtraRequest: [],
+                    NoRequest: [],
+                    PendingRequest: []
+                }
+            };
         }
-      };
-    }
-  }, {
-    key: "Equals",
-    value: function (other) {
-      return equalsUnions(this, other);
-    }
-  }, {
-    key: "CompareTo",
-    value: function (other) {
-      return compareUnions(this, other);
-    }
-  }]);
+    }, {
+        key: "Equals",
+        value: function (other) {
+            return equalsUnions(this, other);
+        }
+    }, {
+        key: "CompareTo",
+        value: function (other) {
+            return compareUnions(this, other);
+        }
+    }]);
 
-  return RenderState;
+    return RenderState;
 }();
 setType("Fable.Arch.Virtualdom.RenderState", RenderState);
 var ViewState = function () {
-  function ViewState(currentTree, nextTree, node, renderState) {
-    _classCallCheck$10(this, ViewState);
+    function ViewState(currentTree, nextTree, node, renderState) {
+        _classCallCheck$10(this, ViewState);
 
-    this.CurrentTree = currentTree;
-    this.NextTree = nextTree;
-    this.Node = node;
-    this.RenderState = renderState;
-  }
+        this.CurrentTree = currentTree;
+        this.NextTree = nextTree;
+        this.Node = node;
+        this.RenderState = renderState;
+    }
 
-  _createClass$10(ViewState, [{
-    key: _Symbol.reflection,
-    value: function () {
-      return {
-        type: "Fable.Arch.Virtualdom.ViewState",
-        interfaces: ["FSharpRecord", "System.IEquatable"],
-        properties: {
-          CurrentTree: Any,
-          NextTree: Any,
-          Node: Interface("Fable.Import.Browser.Node"),
-          RenderState: RenderState
+    _createClass$10(ViewState, [{
+        key: _Symbol.reflection,
+        value: function () {
+            return {
+                type: "Fable.Arch.Virtualdom.ViewState",
+                interfaces: ["FSharpRecord", "System.IEquatable"],
+                properties: {
+                    CurrentTree: Any,
+                    NextTree: Any,
+                    Node: Interface("Fable.Import.Browser.Node"),
+                    RenderState: RenderState
+                }
+            };
         }
-      };
-    }
-  }, {
-    key: "Equals",
-    value: function (other) {
-      return equalsRecords(this, other);
-    }
-  }]);
+    }, {
+        key: "Equals",
+        value: function (other) {
+            return equalsRecords(this, other);
+        }
+    }]);
 
-  return ViewState;
+    return ViewState;
 }();
 setType("Fable.Arch.Virtualdom.ViewState", ViewState);
 function renderSomething(handler, node) {
-  var _target0 = function _target0(attrs, nodes, tag) {
-    return createTree(handler, tag, attrs, map$$1(function (node_1) {
-      return renderSomething(handler, node_1);
-    }, nodes));
-  };
+    var _target0 = function _target0(attrs, nodes, tag) {
+        return createTree(handler, tag, attrs, map$$1(function (node_1) {
+            return renderSomething(handler, node_1);
+        }, nodes));
+    };
 
-  if (node.Case === "Svg") {
-    return _target0(node.Fields[0][1], node.Fields[1], node.Fields[0][0]);
-  } else {
-    if (node.Case === "VoidElement") {
-      var tag = node.Fields[0][0];
-      var attrs = node.Fields[0][1];
-      return createTree(handler, tag, attrs, new List$1());
+    if (node.Case === "Svg") {
+        return _target0(node.Fields[0][1], node.Fields[1], node.Fields[0][0]);
     } else {
-      if (node.Case === "Text") {
-        return node.Fields[0];
-      } else {
-        if (node.Case === "WhiteSpace") {
-          return node.Fields[0];
+        if (node.Case === "VoidElement") {
+            var tag = node.Fields[0][0];
+            var attrs = node.Fields[0][1];
+            return createTree(handler, tag, attrs, new List$1());
         } else {
-          return _target0(node.Fields[0][1], node.Fields[1], node.Fields[0][0]);
+            if (node.Case === "Text") {
+                return node.Fields[0];
+            } else {
+                if (node.Case === "WhiteSpace") {
+                    return node.Fields[0];
+                } else {
+                    return _target0(node.Fields[0][1], node.Fields[1], node.Fields[0][0]);
+                }
+            }
         }
-      }
     }
-  }
 }
 function render(handler, view, viewState) {
-  var tree = renderSomething(handler, view);
-  return new ViewState(viewState.CurrentTree, tree, viewState.Node, viewState.RenderState);
+    var tree = renderSomething(handler, view);
+    return new ViewState(viewState.CurrentTree, tree, viewState.Node, viewState.RenderState);
 }
 function createRender(selector, handler, view) {
-  var node = document.body.querySelector(selector);
-  var tree = renderSomething(handler, view);
-  var vdomNode = create$5(tree);
-  node.appendChild(vdomNode);
-  var viewState = new ViewState(tree, tree, vdomNode, new RenderState("NoRequest", []));
+    var node = document.body.querySelector(selector);
+    var tree = renderSomething(handler, view);
+    var vdomNode = create$5(tree);
+    node.appendChild(vdomNode);
+    var viewState = new ViewState(tree, tree, vdomNode, new RenderState("NoRequest", []));
 
-  var raf = function raf(cb) {
-    return window.requestAnimationFrame(function (fb) {
-      cb();
-    });
-  };
-
-  var render_ = function render_(handler_1) {
-    return function (view_1) {
-      var viewState_ = render(handler_1, view_1, viewState);
-      viewState = viewState_;
-
-      var callBack = function callBack() {
-        var matchValue = viewState.RenderState;
-
-        if (matchValue.Case === "ExtraRequest") {
-          {
-            var RenderState_1 = new RenderState("NoRequest", []);
-            viewState = new ViewState(viewState.CurrentTree, viewState.NextTree, viewState.Node, RenderState_1);
-          }
-        } else {
-          if (matchValue.Case === "NoRequest") {
-            throw new Error("Shouldn't happen");
-          } else {
-            raf(callBack);
-            {
-              var _RenderState_ = new RenderState("ExtraRequest", []);
-
-              viewState = new ViewState(viewState.CurrentTree, viewState.NextTree, viewState.Node, _RenderState_);
-            }
-            var patches = diff(viewState.CurrentTree, viewState.NextTree);
-            patch(viewState.Node, patches);
-            viewState = new ViewState(viewState.NextTree, viewState.NextTree, viewState.Node, viewState.RenderState);
-          }
-        }
-      };
-
-      {
-        var matchValue = viewState.RenderState;
-
-        if (matchValue.Case === "NoRequest") {
-          raf(callBack);
-        }
-      }
-      {
-        var RenderState_1 = new RenderState("PendingRequest", []);
-        viewState = new ViewState(viewState.CurrentTree, viewState.NextTree, viewState.Node, RenderState_1);
-      }
+    var raf = function raf(cb) {
+        return window.requestAnimationFrame(function (fb) {
+            cb();
+        });
     };
-  };
 
-  return render_;
+    var render_ = function render_(handler_1) {
+        return function (view_1) {
+            var viewState_ = render(handler_1, view_1, viewState);
+            viewState = viewState_;
+
+            var callBack = function callBack() {
+                var matchValue = viewState.RenderState;
+
+                if (matchValue.Case === "ExtraRequest") {
+                    {
+                        var RenderState_1 = new RenderState("NoRequest", []);
+                        viewState = new ViewState(viewState.CurrentTree, viewState.NextTree, viewState.Node, RenderState_1);
+                    }
+                } else {
+                    if (matchValue.Case === "NoRequest") {
+                        throw new Error("Shouldn't happen");
+                    } else {
+                        raf(callBack);
+                        {
+                            var _RenderState_ = new RenderState("ExtraRequest", []);
+
+                            viewState = new ViewState(viewState.CurrentTree, viewState.NextTree, viewState.Node, _RenderState_);
+                        }
+                        var patches = diff(viewState.CurrentTree, viewState.NextTree);
+                        patch(viewState.Node, patches);
+                        viewState = new ViewState(viewState.NextTree, viewState.NextTree, viewState.Node, viewState.RenderState);
+                    }
+                }
+            };
+
+            {
+                var matchValue = viewState.RenderState;
+
+                if (matchValue.Case === "NoRequest") {
+                    raf(callBack);
+                }
+            }
+            {
+                var RenderState_1 = new RenderState("PendingRequest", []);
+                viewState = new ViewState(viewState.CurrentTree, viewState.NextTree, viewState.Node, RenderState_1);
+            }
+        };
+    };
+
+    return render_;
 }
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var getEntity$$1 = getEntity$1;
-var aaa = getEntity$$1("bbb");
-console.log("FUNCIONOU?", aaa);
 var Details = function () {
-  function Details(caseName, fields) {
-    _classCallCheck(this, Details);
+    function Details(caseName, fields) {
+        _classCallCheck(this, Details);
 
-    this.Case = caseName;
-    this.Fields = fields;
-  }
+        this.Case = caseName;
+        this.Fields = fields;
+    }
 
-  _createClass(Details, [{
-    key: _Symbol.reflection,
-    value: function () {
-      return {
-        type: "Main.Details",
-        interfaces: ["FSharpUnion", "System.IEquatable", "System.IComparable"],
-        cases: {
-          Character: ["string"],
-          Film: ["string", "string"]
+    _createClass(Details, [{
+        key: _Symbol.reflection,
+        value: function () {
+            return {
+                type: "Main.Details",
+                interfaces: ["FSharpUnion", "System.IEquatable", "System.IComparable"],
+                cases: {
+                    Character: ["string"],
+                    Film: ["string", "string"]
+                }
+            };
         }
-      };
-    }
-  }, {
-    key: "Equals",
-    value: function (other) {
-      return equalsUnions(this, other);
-    }
-  }, {
-    key: "CompareTo",
-    value: function (other) {
-      return compareUnions(this, other);
-    }
-  }]);
+    }, {
+        key: "Equals",
+        value: function (other) {
+            return equalsUnions(this, other);
+        }
+    }, {
+        key: "CompareTo",
+        value: function (other) {
+            return compareUnions(this, other);
+        }
+    }]);
 
-  return Details;
+    return Details;
 }();
 setType("Main.Details", Details);
 var Entity = function () {
-  function Entity(related, details) {
-    _classCallCheck(this, Entity);
+    function Entity(related, details) {
+        _classCallCheck(this, Entity);
 
-    this.related = related;
-    this.details = details;
-  }
+        this.related = related;
+        this.details = details;
+    }
 
-  _createClass(Entity, [{
-    key: _Symbol.reflection,
-    value: function () {
-      return {
-        type: "Main.Entity",
-        interfaces: ["FSharpRecord", "System.IEquatable", "System.IComparable"],
-        properties: {
-          related: makeGeneric(List$1, {
-            T: "string"
-          }),
-          details: Details
+    _createClass(Entity, [{
+        key: _Symbol.reflection,
+        value: function () {
+            return {
+                type: "Main.Entity",
+                interfaces: ["FSharpRecord", "System.IEquatable", "System.IComparable"],
+                properties: {
+                    related: makeGeneric(List$1, {
+                        T: "string"
+                    }),
+                    details: Details
+                }
+            };
         }
-      };
-    }
-  }, {
-    key: "Equals",
-    value: function (other) {
-      return equalsRecords(this, other);
-    }
-  }, {
-    key: "CompareTo",
-    value: function (other) {
-      return compareRecords(this, other);
-    }
-  }]);
+    }, {
+        key: "Equals",
+        value: function (other) {
+            return equalsRecords(this, other);
+        }
+    }, {
+        key: "CompareTo",
+        value: function (other) {
+            return compareRecords(this, other);
+        }
+    }]);
 
-  return Entity;
+    return Entity;
 }();
 setType("Main.Entity", Entity);
 var Model = function () {
-  function Model(caseName, fields) {
-    _classCallCheck(this, Model);
+    function Model(caseName, fields) {
+        _classCallCheck(this, Model);
 
-    this.Case = caseName;
-    this.Fields = fields;
-  }
+        this.Case = caseName;
+        this.Fields = fields;
+    }
 
-  _createClass(Model, [{
-    key: _Symbol.reflection,
-    value: function () {
-      return {
-        type: "Main.Model",
-        interfaces: ["FSharpUnion", "System.IEquatable", "System.IComparable"],
-        cases: {
-          ErrorScreen: [],
-          InitialScreen: [],
-          List: [Entity, makeGeneric(List$1, {
-            T: Entity
-          })],
-          Loading: [Entity]
+    _createClass(Model, [{
+        key: _Symbol.reflection,
+        value: function () {
+            return {
+                type: "Main.Model",
+                interfaces: ["FSharpUnion", "System.IEquatable", "System.IComparable"],
+                cases: {
+                    ErrorScreen: [],
+                    InitialScreen: [],
+                    List: [Entity, makeGeneric(List$1, {
+                        T: Entity
+                    })],
+                    Loading: [Entity]
+                }
+            };
         }
-      };
-    }
-  }, {
-    key: "Equals",
-    value: function (other) {
-      return equalsUnions(this, other);
-    }
-  }, {
-    key: "CompareTo",
-    value: function (other) {
-      return compareUnions(this, other);
-    }
-  }]);
+    }, {
+        key: "Equals",
+        value: function (other) {
+            return equalsUnions(this, other);
+        }
+    }, {
+        key: "CompareTo",
+        value: function (other) {
+            return compareUnions(this, other);
+        }
+    }]);
 
-  return Model;
+    return Model;
 }();
 setType("Main.Model", Model);
-var ResponseJson = function () {
-  function ResponseJson(name, title, episode_id, characters, films) {
-    _classCallCheck(this, ResponseJson);
+var CharacterResponseJson = function () {
+    function CharacterResponseJson(name, films) {
+        _classCallCheck(this, CharacterResponseJson);
 
-    this.name = name;
-    this.title = title;
-    this.episode_id = episode_id;
-    this.characters = characters;
-    this.films = films;
-  }
+        this.name = name;
+        this.films = films;
+    }
 
-  _createClass(ResponseJson, [{
-    key: _Symbol.reflection,
-    value: function () {
-      return {
-        type: "Main.ResponseJson",
-        interfaces: ["FSharpRecord", "System.IEquatable", "System.IComparable"],
-        properties: {
-          name: "string",
-          title: "string",
-          episode_id: "string",
-          characters: makeGeneric(List$1, {
-            T: "string"
-          }),
-          films: makeGeneric(List$1, {
-            T: "string"
-          })
+    _createClass(CharacterResponseJson, [{
+        key: _Symbol.reflection,
+        value: function () {
+            return {
+                type: "Main.CharacterResponseJson",
+                interfaces: ["FSharpRecord", "System.IEquatable", "System.IComparable"],
+                properties: {
+                    name: "string",
+                    films: makeGeneric(List$1, {
+                        T: "string"
+                    })
+                }
+            };
         }
-      };
-    }
-  }, {
-    key: "Equals",
-    value: function (other) {
-      return equalsRecords(this, other);
-    }
-  }, {
-    key: "CompareTo",
-    value: function (other) {
-      return compareRecords(this, other);
-    }
-  }]);
+    }, {
+        key: "Equals",
+        value: function (other) {
+            return equalsRecords(this, other);
+        }
+    }, {
+        key: "CompareTo",
+        value: function (other) {
+            return compareRecords(this, other);
+        }
+    }]);
 
-  return ResponseJson;
+    return CharacterResponseJson;
 }();
-setType("Main.ResponseJson", ResponseJson);
-function parse(json) {
-  var obj = ofJson(json, {
-    T: ResponseJson
-  });
+setType("Main.CharacterResponseJson", CharacterResponseJson);
+var FilmResponseJson = function () {
+    function FilmResponseJson(title, episode_id, characters) {
+        _classCallCheck(this, FilmResponseJson);
 
-  if (isNullOrEmpty(obj.name)) {
-    return new Entity(obj.characters, new Details("Film", [obj.title, obj.episode_id]));
-  } else {
-    return new Entity(obj.films, new Details("Character", [obj.name]));
-  }
+        this.title = title;
+        this.episode_id = episode_id;
+        this.characters = characters;
+    }
+
+    _createClass(FilmResponseJson, [{
+        key: _Symbol.reflection,
+        value: function () {
+            return {
+                type: "Main.FilmResponseJson",
+                interfaces: ["FSharpRecord", "System.IEquatable", "System.IComparable"],
+                properties: {
+                    title: "string",
+                    episode_id: "number",
+                    characters: makeGeneric(List$1, {
+                        T: "string"
+                    })
+                }
+            };
+        }
+    }, {
+        key: "Equals",
+        value: function (other) {
+            return equalsRecords(this, other);
+        }
+    }, {
+        key: "CompareTo",
+        value: function (other) {
+            return compareRecords(this, other);
+        }
+    }]);
+
+    return FilmResponseJson;
+}();
+setType("Main.FilmResponseJson", FilmResponseJson);
+function parse(json) {
+    try {
+        var ch = ofJson(json, {
+            T: CharacterResponseJson
+        });
+        return new Entity(ch.films, new Details("Character", [ch.name]));
+    } catch (matchValue) {
+        var film = ofJson(json, {
+            T: FilmResponseJson
+        });
+        return new Entity(film.characters, new Details("Film", [film.title, String(film.episode_id)]));
+    }
 }
 var Msg = function () {
-  function Msg(caseName, fields) {
-    _classCallCheck(this, Msg);
+    function Msg(caseName, fields) {
+        _classCallCheck(this, Msg);
 
-    this.Case = caseName;
-    this.Fields = fields;
-  }
+        this.Case = caseName;
+        this.Fields = fields;
+    }
 
-  _createClass(Msg, [{
-    key: _Symbol.reflection,
-    value: function () {
-      return {
-        type: "Main.Msg",
-        interfaces: ["FSharpUnion", "System.IEquatable", "System.IComparable"],
-        cases: {
-          FetchFail: [],
-          Load: [Entity],
-          ToList: [Entity, makeGeneric(List$1, {
-            T: Entity
-          })]
+    _createClass(Msg, [{
+        key: _Symbol.reflection,
+        value: function () {
+            return {
+                type: "Main.Msg",
+                interfaces: ["FSharpUnion", "System.IEquatable", "System.IComparable"],
+                cases: {
+                    FetchFail: [],
+                    Load: [Entity],
+                    ToList: [Entity, makeGeneric(List$1, {
+                        T: Entity
+                    })]
+                }
+            };
         }
-      };
-    }
-  }, {
-    key: "Equals",
-    value: function (other) {
-      return equalsUnions(this, other);
-    }
-  }, {
-    key: "CompareTo",
-    value: function (other) {
-      return compareUnions(this, other);
-    }
-  }]);
+    }, {
+        key: "Equals",
+        value: function (other) {
+            return equalsUnions(this, other);
+        }
+    }, {
+        key: "CompareTo",
+        value: function (other) {
+            return compareUnions(this, other);
+        }
+    }]);
 
-  return Msg;
+    return Msg;
 }();
 setType("Main.Msg", Msg);
 function fetchEntity(url) {
-  return function (builder_) {
-    return builder_.Delay(function () {
-      var urlWithoutProtocol = replace$$1(url, "http://", "//");
-      return _fetch(urlWithoutProtocol, {}).then(function (_arg1) {
-        return _arg1.text().then(function (_arg2) {
-          return Promise.resolve(parse(_arg2));
+    return function (builder_) {
+        return builder_.Delay(function () {
+            var urlWithoutProtocol = replace$$1(url, "http://", "//");
+            return _fetch(urlWithoutProtocol, {}).then(function (_arg1) {
+                return _arg1.text().then(function (_arg2) {
+                    return Promise.resolve(parse(_arg2));
+                });
+            });
         });
-      });
-    });
-  }(PromiseImpl.promise);
+    }(PromiseImpl.promise);
 }
 function getFirstCharacter(handler) {
-  (function (pr) {
-    return pr.then(handler);
-  })(function (builder_) {
-    return builder_.Delay(function () {
-      return fetchEntity("http://swapi.co/api/people/2/").then(function (_arg1) {
-        return Promise.resolve(new Msg("Load", [_arg1]));
-      });
-    });
-  }(PromiseImpl.promise));
+    (function (pr) {
+        return pr.then(handler);
+    })(function (builder_) {
+        return builder_.Delay(function () {
+            return fetchEntity("http://swapi.co/api/people/2/").then(function (_arg1) {
+                return Promise.resolve(new Msg("Load", [_arg1]));
+            });
+        });
+    }(PromiseImpl.promise));
 }
 function getRelatedEntities(entity, handler) {
-  (function (pr) {
-    return pr.then(handler);
-  })(Promise.all(map$$1(function (url) {
-    return fetchEntity(url);
-  }, entity.related)).then(function (list) {
-    return new Msg("ToList", [entity, ofArray(list)]);
-  }));
+    (function (pr) {
+        return pr.then(handler);
+    })(Promise.all(map$$1(function (url) {
+        return fetchEntity(url);
+    }, entity.related)).then(function (list) {
+        return new Msg("ToList", [entity, ofArray(list)]);
+    }));
 }
 function update(model, msg) {
-  return msg.Case === "ToList" ? [new Model("List", [msg.Fields[0], msg.Fields[1]]), new List$1()] : msg.Case === "FetchFail" ? [new Model("ErrorScreen", []), new List$1()] : [new Model("Loading", [msg.Fields[0]]), ofArray([function (handler) {
-    getRelatedEntities(msg.Fields[0], handler);
-  }])];
+    return msg.Case === "ToList" ? [new Model("List", [msg.Fields[0], msg.Fields[1]]), new List$1()] : msg.Case === "FetchFail" ? [new Model("ErrorScreen", []), new List$1()] : [new Model("Loading", [msg.Fields[0]]), ofArray([function (handler) {
+        getRelatedEntities(msg.Fields[0], handler);
+    }])];
 }
 function bgColor(entity) {
-  return entity.details.Case === "Film" ? "rgba(52, 152, 219,1.0)" : "rgba(230, 126, 34,1.0)";
+    return entity.details.Case === "Film" ? "rgba(52, 152, 219,1.0)" : "rgba(230, 126, 34,1.0)";
 }
 function mainStyle(entity) {
-  return new Types.Attribute("Style", [ofArray([["background-color", bgColor(entity)], ["width", "200px"], ["height", "200px"], ["color", "white"], ["font-family", "-apple-system, system, sans-serif"], ["margin", "20px 0px 0px 20px"], ["cursor", "pointer"]])]);
+    return new Types.Attribute("Style", [ofArray([["background-color", bgColor(entity)], ["width", "200px"], ["height", "200px"], ["color", "white"], ["font-family", "-apple-system, system, sans-serif"], ["margin", "20px 0px 0px 20px"], ["cursor", "pointer"]])]);
 }
 function filmNumberStyle() {
-  return new Types.Attribute("Style", [ofArray([["padding", "20px 20px 0px 20px"], ["font-size", "60px"]])]);
+    return new Types.Attribute("Style", [ofArray([["padding", "20px 20px 0px 20px"], ["font-size", "60px"]])]);
 }
 function captionStyle() {
-  return new Types.Attribute("Style", [ofArray([["padding", "20px"], ["font-size", "18px"]])]);
+    return new Types.Attribute("Style", [ofArray([["padding", "20px"], ["font-size", "18px"]])]);
 }
 function filmContents(title, episode) {
-  return ofArray([function () {
-    var tagName = "div";
-    return function (children) {
-      return new Types.DomNode("Element", [[tagName, ofArray([filmNumberStyle()])], children]);
-    };
-  }()(ofArray([new Types.DomNode("Text", [episode])])), function () {
-    var tagName = "div";
-    return function (children) {
-      return new Types.DomNode("Element", [[tagName, ofArray([captionStyle()])], children]);
-    };
-  }()(ofArray([new Types.DomNode("Text", [title])]))]);
+    return ofArray([function () {
+        var tagName = "div";
+        return function (children) {
+            return new Types.DomNode("Element", [[tagName, ofArray([filmNumberStyle()])], children]);
+        };
+    }()(ofArray([new Types.DomNode("Text", [episode])])), function () {
+        var tagName = "div";
+        return function (children) {
+            return new Types.DomNode("Element", [[tagName, ofArray([captionStyle()])], children]);
+        };
+    }()(ofArray([new Types.DomNode("Text", [title])]))]);
 }
 function characterContents(name) {
-  return ofArray([function () {
-    var tagName = "div";
-    return function (children) {
-      return new Types.DomNode("Element", [[tagName, ofArray([captionStyle()])], children]);
-    };
-  }()(ofArray([new Types.DomNode("Text", [name])]))]);
+    return ofArray([function () {
+        var tagName = "div";
+        return function (children) {
+            return new Types.DomNode("Element", [[tagName, ofArray([captionStyle()])], children]);
+        };
+    }()(ofArray([new Types.DomNode("Text", [name])]))]);
 }
 function entityView(entity) {
-  var attributes = ofArray([mainStyle(entity), function () {
-    var h = function h(e) {
-      e.stopPropagation();
-      e.preventDefault();
-      return function (_arg1) {
-        return entity;
-      }(e);
-    };
+    var attributes = ofArray([mainStyle(entity), function () {
+        var h = function h(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            return function (_arg1) {
+                return entity;
+            }(e);
+        };
 
-    return new Types.Attribute("EventHandler", [["onclick", h]]);
-  }()]);
-  var contents = entity.details.Case === "Character" ? characterContents(entity.details.Fields[0]) : filmContents(entity.details.Fields[0], entity.details.Fields[1]);
-  return function () {
-    var tagName = "div";
-    return function (children) {
-      return new Types.DomNode("Element", [[tagName, attributes], children]);
-    };
-  }()(contents);
+        return new Types.Attribute("EventHandler", [["onclick", h]]);
+    }()]);
+    var contents = entity.details.Case === "Character" ? characterContents(entity.details.Fields[0]) : filmContents(entity.details.Fields[0], entity.details.Fields[1]);
+    return function () {
+        var tagName = "div";
+        return function (children) {
+            return new Types.DomNode("Element", [[tagName, attributes], children]);
+        };
+    }()(contents);
 }
 function messageStyle() {
-  return new Types.Attribute("Style", [ofArray([["margin", "20px 0px 0px 20px"], ["width", "200px"], ["height", "200px"], ["font-family", "-apple-system, system, sans-serif"], ["color", "rgba(149, 165, 166,1.0)"], ["font-size", "18px"]])]);
+    return new Types.Attribute("Style", [ofArray([["margin", "20px 0px 0px 20px"], ["width", "200px"], ["height", "200px"], ["font-family", "-apple-system, system, sans-serif"], ["color", "rgba(149, 165, 166,1.0)"], ["font-size", "18px"]])]);
 }
 function messageView(t) {
-  return function () {
-    var tagName = "div";
-    return function (children) {
-      return new Types.DomNode("Element", [[tagName, ofArray([messageStyle()])], children]);
-    };
-  }()(ofArray([new Types.DomNode("Text", [t])]));
+    return function () {
+        var tagName = "div";
+        return function (children) {
+            return new Types.DomNode("Element", [[tagName, ofArray([messageStyle()])], children]);
+        };
+    }()(ofArray([new Types.DomNode("Text", [t])]));
 }
 function loadingMessageView(entity) {
-  return entity.details.Case === "Character" ? messageView("Loading " + entity.details.Fields[0] + " films...") : messageView("Loading " + entity.details.Fields[0] + " characters...");
+    return entity.details.Case === "Character" ? messageView("Loading " + entity.details.Fields[0] + " films...") : messageView("Loading " + entity.details.Fields[0] + " characters...");
 }
 function mappedEntityView(entity) {
-  return map$5(function (arg0) {
-    return new Msg("Load", [arg0]);
-  }, entityView(entity));
+    return map$5(function (arg0) {
+        return new Msg("Load", [arg0]);
+    }, entityView(entity));
 }
 function view(model) {
-  return model.Case === "Loading" ? function () {
-    var tagName = "div";
-    return function (children) {
-      return new Types.DomNode("Element", [[tagName, ofArray([new Types.Attribute("Style", [ofArray([["display", "flex"]])])])], children]);
-    };
-  }()(ofArray([mappedEntityView(model.Fields[0]), loadingMessageView(model.Fields[0])])) : model.Case === "List" ? function () {
-    var listView = map$$1(function (entity) {
-      return mappedEntityView(entity);
-    }, model.Fields[1]);
-    return function () {
-      var tagName = "div";
-      return function (children) {
-        return new Types.DomNode("Element", [[tagName, ofArray([new Types.Attribute("Style", [ofArray([["display", "flex"]])])])], children]);
-      };
-    }()(ofArray([mappedEntityView(model.Fields[0]), function () {
-      var tagName = "div";
-      return function (children) {
-        return new Types.DomNode("Element", [[tagName, new List$1()], children]);
-      };
-    }()(listView)]));
-  }() : model.Case === "ErrorScreen" ? messageView("An error ocurred. Please refresh the page and try again - and may the Force be with you!") : messageView("Loading amazing characters and films...");
+    return model.Case === "Loading" ? function () {
+        var tagName = "div";
+        return function (children) {
+            return new Types.DomNode("Element", [[tagName, ofArray([new Types.Attribute("Style", [ofArray([["display", "flex"]])])])], children]);
+        };
+    }()(ofArray([mappedEntityView(model.Fields[0]), loadingMessageView(model.Fields[0])])) : model.Case === "List" ? function () {
+        var listView = map$$1(function (entity) {
+            return mappedEntityView(entity);
+        }, model.Fields[1]);
+        return function () {
+            var tagName = "div";
+            return function (children) {
+                return new Types.DomNode("Element", [[tagName, ofArray([new Types.Attribute("Style", [ofArray([["display", "flex"]])])])], children]);
+            };
+        }()(ofArray([mappedEntityView(model.Fields[0]), function () {
+            var tagName = "div";
+            return function (children) {
+                return new Types.DomNode("Element", [[tagName, new List$1()], children]);
+            };
+        }()(listView)]));
+    }() : model.Case === "ErrorScreen" ? messageView("An error ocurred. Please refresh the page and try again - and may the Force be with you!") : messageView("Loading amazing characters and films...");
 }
 AppApi.start(AppApi.withSubscriber(function (x) {
-  console.log("Event received: ", x);
+    console.log("Event received: ", x);
 }, AppApi.withInitMessage(function (handler) {
-  getFirstCharacter(handler);
+    getFirstCharacter(handler);
 }, AppApi.withStartNodeSelector("#app", AppApi.createApp(new Model("InitialScreen", []), function (model) {
-  return view(model);
+    return view(model);
 }, function (model) {
-  return function (msg) {
-    return update(model, msg);
-  };
-}, function (selector) {
-  return function (handler) {
-    return function (view_1) {
-      return createRender(selector, handler, view_1);
+    return function (msg) {
+        return update(model, msg);
     };
-  };
+}, function (selector) {
+    return function (handler) {
+        return function (view_1) {
+            return createRender(selector, handler, view_1);
+        };
+    };
 })))));
 
-exports.getEntity = getEntity$$1;
-exports.aaa = aaa;
 exports.Details = Details;
 exports.Entity = Entity;
 exports.Model = Model;
-exports.ResponseJson = ResponseJson;
+exports.CharacterResponseJson = CharacterResponseJson;
+exports.FilmResponseJson = FilmResponseJson;
 exports.parse = parse;
 exports.Msg = Msg;
 exports.fetchEntity = fetchEntity;
@@ -5558,3 +5665,5 @@ exports.mappedEntityView = mappedEntityView;
 exports.view = view;
 
 }((this.Main = this.Main || {})));
+
+//# sourceMappingURL=bundle.js.map

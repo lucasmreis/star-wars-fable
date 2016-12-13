@@ -20,9 +20,9 @@ open Fable.Arch
 open Fable.Arch.Html
 open Fable.Arch.App.AppApi
 
-let getEntity = importMember<string->string> "./js/get-entity.js"
+// let getEntity = importMember<string->string> "./js/get-entity.js"
 
-let someValue = getEntity "someString"
+// let someValue = getEntity "someString"
 
 
 // -----------------------------------------------------------------------------------
@@ -45,21 +45,25 @@ type Model =
     | List of Entity * Entity list
     | ErrorScreen
 
-type ResponseJson =
+type CharacterResponseJson =
     { name : string
-      title : string
-      episode_id : string
-      characters : string list
       films : string list }
 
+type FilmResponseJson =
+    { title : string
+      episode_id : int
+      characters : string list }
+
 let parse json =
-    let obj = ofJson<ResponseJson> json
-    if String.IsNullOrEmpty obj.name then
-        { related = obj.characters
-          details = Film ( obj.title , obj.episode_id ) }
-    else
-        { related = obj.films
-          details = Character obj.name }
+    try
+      let ch = ofJson<CharacterResponseJson> json
+      { related = ch.films
+        details = Character ch.name }
+    with _ ->
+      let film = ofJson<FilmResponseJson> json
+      { related = film.characters
+        details = Film ( film.title , film.episode_id.ToString() ) }
+
 
 // -----------------------------------------------------------------------------------
 // UPDATE
