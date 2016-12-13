@@ -20,6 +20,11 @@ open Fable.Arch
 open Fable.Arch.Html
 open Fable.Arch.App.AppApi
 
+let getEntity = importMember<string->string> "./js/get-entity.js"
+
+let someValue = getEntity "someString"
+
+
 // -----------------------------------------------------------------------------------
 // MODEL
 //
