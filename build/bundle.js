@@ -5439,17 +5439,35 @@ var FilmResponseJson = function () {
     return FilmResponseJson;
 }();
 setType("Main.FilmResponseJson", FilmResponseJson);
-function parse(json) {
+function ofBetterJson(text, _genArgs) {
     try {
-        var ch = ofJson(json, {
-            T: CharacterResponseJson
+        var json = ofJson(text, {
+            T: _genArgs.a
         });
-        return new Entity(ch.films, new Details("Character", [ch.name]));
+        return json;
     } catch (matchValue) {
-        var film = ofJson(json, {
-            T: FilmResponseJson
-        });
-        return new Entity(film.characters, new Details("Film", [film.title, String(film.episode_id)]));
+        return null;
+    }
+}
+function parse(text) {
+    var chRecord = ofBetterJson(text, {
+        a: CharacterResponseJson
+    });
+    var filmRecord = ofBetterJson(text, {
+        a: FilmResponseJson
+    });
+    var matchValue = [chRecord, filmRecord];
+
+    if (matchValue[0] != null) {
+        var ch = matchValue[0];
+        return new Entity(ch.films, new Details("Character", [ch.name]));
+    } else {
+        if (matchValue[1] != null) {
+            var film = matchValue[1];
+            return new Entity(film.characters, new Details("Film", [film.title, String(film.episode_id)]));
+        } else {
+            throw new Error("/home/lucas.reis/Projects/star-wars-fable/src/Main.fsx", 67, 12);
+        }
     }
 }
 var Msg = function () {
@@ -5645,6 +5663,7 @@ exports.Entity = Entity;
 exports.Model = Model;
 exports.CharacterResponseJson = CharacterResponseJson;
 exports.FilmResponseJson = FilmResponseJson;
+exports.ofBetterJson = ofBetterJson;
 exports.parse = parse;
 exports.Msg = Msg;
 exports.fetchEntity = fetchEntity;

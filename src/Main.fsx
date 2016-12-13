@@ -54,15 +54,23 @@ type FilmResponseJson =
       episode_id : int
       characters : string list }
 
-let parse json =
+let [<PassGenericsAttribute>] ofBetterJson<'a> text =
     try
-      let ch = ofJson<CharacterResponseJson> json
-      { related = ch.films
-        details = Character ch.name }
+        let json = ofJson<'a> text
+        Some json
     with _ ->
-      let film = ofJson<FilmResponseJson> json
-      { related = film.characters
-        details = Film ( film.title , film.episode_id.ToString() ) }
+        None
+
+let parse text =
+    let chRecord = ofBetterJson<CharacterResponseJson> text
+    let filmRecord = ofBetterJson<FilmResponseJson> text
+    match ( chRecord , filmRecord ) with
+    | Some ch , _ ->
+        { related = ch.films
+          details = Character ch.name }
+    | _ , Some film ->
+        { related = film.characters
+          details = Film ( film.title , film.episode_id.ToString() ) }
 
 
 // -----------------------------------------------------------------------------------
