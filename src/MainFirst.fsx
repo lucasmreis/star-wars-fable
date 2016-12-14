@@ -18,11 +18,7 @@ module Character =
         { name: string
           films: string list }
 
-    let parse str =
-        try
-            let obj = ofJson<Model> str
-            Some obj
-        with _ -> None
+    let parse = ofJson<Model>
 
     let mainStyle =
         Style
@@ -56,13 +52,10 @@ module Film =
           characters: string list }
 
     let parse str =
-        try
-            let obj = ofJson<ModelJSON> str
-            Some
-                { title = obj.title
-                  episodeId = obj.episode_id
-                  characters = obj.characters }
-        with _ -> None
+        let obj = ofJson<ModelJSON> str
+        { title = obj.title
+          episodeId = obj.episode_id
+          characters = obj.characters }
 
     let mainStyle =
         Style
@@ -112,47 +105,29 @@ let fetchEntity url parser =
         return response |> parser }
 
 let getCharacter handler =
-    promise {
-        try
-            let! character = fetchEntity "http://swapi.co/api/people/1/" Character.parse
-            return
-                match character with
-                | Some ch -> LoadFilms ch
-                | None -> FetchFail
-        with e ->
-            return FetchFail }
+    fetchEntity "http://swapi.co/api/people/1/" Character.parse
+    |> Promise.map LoadFilms
+    |> Promise.catch ( fun _ -> FetchFail )
     |> Promise.map handler
     |> ignore
 
 let getCharacters (film: Film.Model) handler =
     film.characters
-        |> List.map ( fun url -> promise {
-            try
-                return! fetchEntity url Character.parse
-            with e ->
-                return None } )
-        |> Promise.Parallel
-        |> Promise.map (
-            Array.choose id
-            >> Array.toList
-            >> fun chs -> ToCharactersFromFilm (film, chs)
-            >> handler )
-        |> ignore
+    |> List.map ( fun url -> fetchEntity url Character.parse )
+    |> Promise.Parallel
+    |> Promise.map ( fun chs -> ToCharactersFromFilm (film, List.ofArray chs) )
+    |> Promise.catch ( fun _ -> FetchFail )
+    |> Promise.map handler
+    |> ignore
 
 let getFilms (character: Character.Model) handler =
     character.films
-        |> List.map ( fun url -> promise {
-            try
-                return! fetchEntity url Film.parse
-            with e ->
-                return None } )
-        |> Promise.Parallel
-        |> Promise.map (
-            Array.choose id
-            >> Array.toList
-            >> fun fs -> ToFilmsFromCharacter (character, fs)
-            >> handler )
-        |> ignore
+    |> List.map ( fun url -> fetchEntity url Film.parse )
+    |> Promise.Parallel
+    |> Promise.map ( fun fs -> ToFilmsFromCharacter (character, List.ofArray fs) )
+    |> Promise.catch ( fun _ -> FetchFail )
+    |> Promise.map handler
+    |> ignore
 
 let update model msg =
     match msg with

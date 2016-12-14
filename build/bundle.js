@@ -254,7 +254,6 @@ var _createClass$2 = function () { function defineProperties(target, props) { fo
 
 function _classCallCheck$2(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-// This module is split from List.ts to prevent cyclic dependencies
 function ofArray(args, base) {
     var acc = base || new List$1();
     for (var i = args.length - 1; i >= 0; i--) {
@@ -586,9 +585,6 @@ var _createClass$3 = function () { function defineProperties(target, props) { fo
 
 function _classCallCheck$3(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-// ----------------------------------------------
-// These functions belong to Seq.ts but are
-// implemented here to prevent cyclic dependencies
 
 
 var MapTree = function MapTree(caseName, fields) {
@@ -722,44 +718,6 @@ function tree_mem(comparer, k, m) {
         }
     }() : false;
 }
-// function tree_foldFromTo(comparer: IComparer<any>, lo: any, hi: any, f: (k:any, v:any, acc: any) => any, m: MapTree, x: any): any {
-//   if (m.Case === "MapOne") {
-//     var cLoKey = comparer.Compare(lo, m.Fields[0]);
-//     var cKeyHi = comparer.Compare(m.Fields[0], hi);
-//     var x_1 = (cLoKey <= 0 ? cKeyHi <= 0 : false) ? f(m.Fields[0], m.Fields[1], x) : x;
-//     return x_1;
-//   }
-//   else if (m.Case === "MapNode") {
-//     var cLoKey = comparer.Compare(lo, m.Fields[0]);
-//     var cKeyHi = comparer.Compare(m.Fields[0], hi);
-//     var x_1 = cLoKey < 0 ? tree_foldFromTo(comparer, lo, hi, f, m.Fields[2], x) : x;
-//     var x_2 = (cLoKey <= 0 ? cKeyHi <= 0 : false) ? f(m.Fields[0], m.Fields[1], x_1) : x_1;
-//     var x_3 = cKeyHi < 0 ? tree_foldFromTo(comparer, lo, hi, f, m.Fields[3], x_2) : x_2;
-//     return x_3;
-//   }
-//   return x;
-// }
-// function tree_foldSection(comparer: IComparer<any>, lo: any, hi: any, f: (k:any, v:any, acc: any) => any, m: MapTree, x: any) {
-//   return comparer.Compare(lo, hi) === 1 ? x : tree_foldFromTo(comparer, lo, hi, f, m, x);
-// }
-// function tree_loop(m: MapTree, acc: any): List<[any,any]> {
-//   return m.Case === "MapOne"
-//     ? new List([m.Fields[0], m.Fields[1]], acc)
-//     : m.Case === "MapNode"
-//       ? tree_loop(m.Fields[2], new List([m.Fields[0], m.Fields[1]], tree_loop(m.Fields[3], acc)))
-//       : acc;
-// }
-// function tree_toList(m: MapTree) {
-//   return tree_loop(m, new List());
-// }
-// function tree_toArray(m: MapTree) {
-//   return Array.from(tree_toList(m));
-// }
-// function tree_ofList(comparer: IComparer<any>, l: List<[any,any]>) {
-//   return Seq.fold((acc: MapTree, tupledArg: [any, any]) => {
-//     return tree_add(comparer, tupledArg[0], tupledArg[1], acc);
-//   }, tree_empty(), l);
-// }
 function tree_mkFromEnumerator(comparer, acc, e) {
     var cur = e.next();
     while (!cur.done) {
@@ -997,9 +955,6 @@ var _createClass$5 = function () { function defineProperties(target, props) { fo
 
 function _classCallCheck$5(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-// ----------------------------------------------
-// These functions belong to Seq.ts but are
-// implemented here to prevent cyclic dependencies
 
 
 var SetTree = function SetTree(caseName, fields) {
@@ -1492,7 +1447,7 @@ function __getValue(d, key) {
 }
 
 
-function parse$1(v, kind) {
+function parse(v, kind) {
     var date = v == null ? new Date() : new Date(v);
     if (isNaN(date.getTime())) throw new Error("The string is not a valid Date.");
     date.kind = kind || (typeof v == "string" && v.slice(-1) == "Z" ? 1 /* UTC */ : 2 /* Local */);
@@ -1672,11 +1627,6 @@ function padLeft(str, len, ch, isRight) {
     }return str;
 }
 
-
-function replace$$1(str, search, replace$$1) {
-    return str.replace(new RegExp(escape(search), "g"), replace$$1);
-}
-
 var _typeof$1 = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
 
 function _defineProperty$2(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
@@ -1805,7 +1755,7 @@ function inflate(val, typ, path) {
     } else if (typeof typ === "function") {
         var proto = typ.prototype;
         if (typ === Date) {
-            return parse$1(val);
+            return parse(val);
         }
         if (proto instanceof List$1) {
             return ofArray(inflateArray(val, resolveGeneric(0, enclosing), path));
@@ -1882,19 +1832,154 @@ function ofJson(json, genArgs) {
     return inflate(JSON.parse(json), genArgs ? genArgs.T : null, "");
 }
 
-var _createClass$7 = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+var _createClass$6 = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-function _classCallCheck$7(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+function _classCallCheck$6(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var Types = function (__exports) {
+    var Attribute = __exports.Attribute = function () {
+        function Attribute(caseName, fields) {
+            _classCallCheck$6(this, Attribute);
+
+            this.Case = caseName;
+            this.Fields = fields;
+        }
+
+        _createClass$6(Attribute, [{
+            key: _Symbol.reflection,
+            value: function () {
+                return {
+                    type: "Fable.Arch.Html.Types.Attribute",
+                    interfaces: ["FSharpUnion"],
+                    cases: {
+                        Attribute: [Tuple(["string", "string"])],
+                        EventHandler: [Tuple(["string", "function"])],
+                        Property: [Tuple(["string", "string"])],
+                        Style: [makeGeneric(List$1, {
+                            T: Tuple(["string", "string"])
+                        })]
+                    }
+                };
+            }
+        }]);
+
+        return Attribute;
+    }();
+
+    setType("Fable.Arch.Html.Types.Attribute", Attribute);
+
+    var DomNode = __exports.DomNode = function () {
+        function DomNode(caseName, fields) {
+            _classCallCheck$6(this, DomNode);
+
+            this.Case = caseName;
+            this.Fields = fields;
+        }
+
+        _createClass$6(DomNode, [{
+            key: _Symbol.reflection,
+            value: function () {
+                return {
+                    type: "Fable.Arch.Html.Types.DomNode",
+                    interfaces: ["FSharpUnion"],
+                    cases: {
+                        Element: [Tuple(["string", makeGeneric(List$1, {
+                            T: makeGeneric(Attribute, {
+                                TMessage: GenericParam("TMessage")
+                            })
+                        })]), makeGeneric(List$1, {
+                            T: makeGeneric(DomNode, {
+                                TMessage: GenericParam("TMessage")
+                            })
+                        })],
+                        Svg: [Tuple(["string", makeGeneric(List$1, {
+                            T: makeGeneric(Attribute, {
+                                TMessage: GenericParam("TMessage")
+                            })
+                        })]), makeGeneric(List$1, {
+                            T: makeGeneric(DomNode, {
+                                TMessage: GenericParam("TMessage")
+                            })
+                        })],
+                        Text: ["string"],
+                        VoidElement: [Tuple(["string", makeGeneric(List$1, {
+                            T: makeGeneric(Attribute, {
+                                TMessage: GenericParam("TMessage")
+                            })
+                        })])],
+                        WhiteSpace: ["string"]
+                    }
+                };
+            }
+        }]);
+
+        return DomNode;
+    }();
+
+    setType("Fable.Arch.Html.Types.DomNode", DomNode);
+    return __exports;
+}({});
+function mapEventHandler(mapping, e, f) {
+    return new Types.Attribute("EventHandler", [[e, function ($var1) {
+        return mapping(f($var1));
+    }]]);
+}
+function mapAttributes(mapping, attribute) {
+    return attribute.Case === "Style" ? new Types.Attribute("Style", [attribute.Fields[0]]) : attribute.Case === "Property" ? new Types.Attribute("Property", [attribute.Fields[0]]) : attribute.Case === "Attribute" ? new Types.Attribute("Attribute", [attribute.Fields[0]]) : mapEventHandler(mapping, attribute.Fields[0][0], attribute.Fields[0][1]);
+}
+function mapElem(mapping, node_0, node_1) {
+    var node = [node_0, node_1];
+    return [node[0], map$$1(function (attribute) {
+        return mapAttributes(mapping, attribute);
+    }, node[1])];
+}
+function mapVoidElem(mapping, node_0, node_1) {
+    var node = [node_0, node_1];
+    return [node[0], map$$1(function (attribute) {
+        return mapAttributes(mapping, attribute);
+    }, node[1])];
+}
+function map$4(mapping, node) {
+    return node.Case === "VoidElement" ? new Types.DomNode("VoidElement", [mapVoidElem(mapping, node.Fields[0][0], node.Fields[0][1])]) : node.Case === "Text" ? new Types.DomNode("Text", [node.Fields[0]]) : node.Case === "WhiteSpace" ? new Types.DomNode("WhiteSpace", [node.Fields[0]]) : node.Case === "Svg" ? new Types.DomNode("Element", [mapElem(mapping, node.Fields[0][0], node.Fields[0][1]), map$$1(function (node_1) {
+        return map$4(mapping, node_1);
+    }, node.Fields[1])]) : new Types.DomNode("Element", [mapElem(mapping, node.Fields[0][0], node.Fields[0][1]), map$$1(function (node_1) {
+        return map$4(mapping, node_1);
+    }, node.Fields[1])]);
+}
+var Attributes = function (__exports) {
+    var classBaseList = __exports.classBaseList = function (b, list) {
+        return new Types.Attribute("Attribute", [["class", fsFormat("%s %s")(function (x) {
+            return x;
+        })(b)(join(" ", map$1(function (tupledArg) {
+            return tupledArg[0];
+        }, filter$1(function (tupledArg) {
+            return tupledArg[1];
+        }, list))))]]);
+    };
+
+    return __exports;
+}({});
+var Svg = function (__exports) {
+    var svgNS = __exports.svgNS = function () {
+        return new Types.Attribute("Property", [["namespace", "http://www.w3.org/2000/svg"]]);
+    };
+
+    return __exports;
+}({});
+
+var _createClass$8 = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck$8(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var Result = function () {
     function Result(caseName, fields) {
-        _classCallCheck$7(this, Result);
+        _classCallCheck$8(this, Result);
 
         this.Case = caseName;
         this.Fields = fields;
     }
 
-    _createClass$7(Result, [{
+    _createClass$8(Result, [{
         key: _Symbol.reflection,
         value: function value() {
             return {
@@ -1922,14 +2007,14 @@ var Result = function () {
 }();
 setType("Fable.PowerPack.Result.Result", Result);
 
-function map$4(fn, a) {
+function map$5(fn, a) {
     return a.Case === "Error" ? new Result("Error", [a.Fields[0]]) : new Result("Ok", [fn(a.Fields[0])]);
 }
 function bind(fn, a) {
     return a.Case === "Error" ? new Result("Error", [a.Fields[0]]) : fn(a.Fields[0]);
 }
 var ResultBuilder = function () {
-    _createClass$7(ResultBuilder, [{
+    _createClass$8(ResultBuilder, [{
         key: _Symbol.reflection,
         value: function value() {
             return {
@@ -1940,10 +2025,10 @@ var ResultBuilder = function () {
     }]);
 
     function ResultBuilder() {
-        _classCallCheck$7(this, ResultBuilder);
+        _classCallCheck$8(this, ResultBuilder);
     }
 
-    _createClass$7(ResultBuilder, [{
+    _createClass$8(ResultBuilder, [{
         key: "Bind",
         value: function Bind(m, f) {
             return bind(f, m);
@@ -1981,9 +2066,9 @@ var ResultBuilder = function () {
 setType("Fable.PowerPack.Result.ResultBuilder", ResultBuilder);
 var result = new ResultBuilder();
 
-var _createClass$6 = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+var _createClass$7 = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-function _classCallCheck$6(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+function _classCallCheck$7(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var _Promise = function (__exports) {
     var result$$1 = __exports.result = function result$$1(a) {
@@ -1996,7 +2081,7 @@ var _Promise = function (__exports) {
 
     var mapResult = __exports.mapResult = function mapResult(fn, a) {
         return a.then(function (a_1) {
-            return map$4(fn, a_1);
+            return map$5(fn, a_1);
         });
     };
 
@@ -2007,7 +2092,7 @@ var _Promise = function (__exports) {
     };
 
     var PromiseBuilder = __exports.PromiseBuilder = function () {
-        _createClass$6(PromiseBuilder, [{
+        _createClass$7(PromiseBuilder, [{
             key: _Symbol.reflection,
             value: function value() {
                 return {
@@ -2018,10 +2103,10 @@ var _Promise = function (__exports) {
         }]);
 
         function PromiseBuilder() {
-            _classCallCheck$6(this, PromiseBuilder);
+            _classCallCheck$7(this, PromiseBuilder);
         }
 
-        _createClass$6(PromiseBuilder, [{
+        _createClass$7(PromiseBuilder, [{
             key: "For",
             value: function For(seq, body) {
                 var p = Promise.resolve();
@@ -2137,141 +2222,6 @@ function _fetch(url, init) {
         }();
     });
 }
-
-var _createClass$8 = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
-
-function _classCallCheck$8(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-var Types = function (__exports) {
-    var Attribute = __exports.Attribute = function () {
-        function Attribute(caseName, fields) {
-            _classCallCheck$8(this, Attribute);
-
-            this.Case = caseName;
-            this.Fields = fields;
-        }
-
-        _createClass$8(Attribute, [{
-            key: _Symbol.reflection,
-            value: function () {
-                return {
-                    type: "Fable.Arch.Html.Types.Attribute",
-                    interfaces: ["FSharpUnion"],
-                    cases: {
-                        Attribute: [Tuple(["string", "string"])],
-                        EventHandler: [Tuple(["string", "function"])],
-                        Property: [Tuple(["string", "string"])],
-                        Style: [makeGeneric(List$1, {
-                            T: Tuple(["string", "string"])
-                        })]
-                    }
-                };
-            }
-        }]);
-
-        return Attribute;
-    }();
-
-    setType("Fable.Arch.Html.Types.Attribute", Attribute);
-
-    var DomNode = __exports.DomNode = function () {
-        function DomNode(caseName, fields) {
-            _classCallCheck$8(this, DomNode);
-
-            this.Case = caseName;
-            this.Fields = fields;
-        }
-
-        _createClass$8(DomNode, [{
-            key: _Symbol.reflection,
-            value: function () {
-                return {
-                    type: "Fable.Arch.Html.Types.DomNode",
-                    interfaces: ["FSharpUnion"],
-                    cases: {
-                        Element: [Tuple(["string", makeGeneric(List$1, {
-                            T: makeGeneric(Attribute, {
-                                TMessage: GenericParam("TMessage")
-                            })
-                        })]), makeGeneric(List$1, {
-                            T: makeGeneric(DomNode, {
-                                TMessage: GenericParam("TMessage")
-                            })
-                        })],
-                        Svg: [Tuple(["string", makeGeneric(List$1, {
-                            T: makeGeneric(Attribute, {
-                                TMessage: GenericParam("TMessage")
-                            })
-                        })]), makeGeneric(List$1, {
-                            T: makeGeneric(DomNode, {
-                                TMessage: GenericParam("TMessage")
-                            })
-                        })],
-                        Text: ["string"],
-                        VoidElement: [Tuple(["string", makeGeneric(List$1, {
-                            T: makeGeneric(Attribute, {
-                                TMessage: GenericParam("TMessage")
-                            })
-                        })])],
-                        WhiteSpace: ["string"]
-                    }
-                };
-            }
-        }]);
-
-        return DomNode;
-    }();
-
-    setType("Fable.Arch.Html.Types.DomNode", DomNode);
-    return __exports;
-}({});
-function mapEventHandler(mapping, e, f) {
-    return new Types.Attribute("EventHandler", [[e, function ($var1) {
-        return mapping(f($var1));
-    }]]);
-}
-function mapAttributes(mapping, attribute) {
-    return attribute.Case === "Style" ? new Types.Attribute("Style", [attribute.Fields[0]]) : attribute.Case === "Property" ? new Types.Attribute("Property", [attribute.Fields[0]]) : attribute.Case === "Attribute" ? new Types.Attribute("Attribute", [attribute.Fields[0]]) : mapEventHandler(mapping, attribute.Fields[0][0], attribute.Fields[0][1]);
-}
-function mapElem(mapping, node_0, node_1) {
-    var node = [node_0, node_1];
-    return [node[0], map$$1(function (attribute) {
-        return mapAttributes(mapping, attribute);
-    }, node[1])];
-}
-function mapVoidElem(mapping, node_0, node_1) {
-    var node = [node_0, node_1];
-    return [node[0], map$$1(function (attribute) {
-        return mapAttributes(mapping, attribute);
-    }, node[1])];
-}
-function map$5(mapping, node) {
-    return node.Case === "VoidElement" ? new Types.DomNode("VoidElement", [mapVoidElem(mapping, node.Fields[0][0], node.Fields[0][1])]) : node.Case === "Text" ? new Types.DomNode("Text", [node.Fields[0]]) : node.Case === "WhiteSpace" ? new Types.DomNode("WhiteSpace", [node.Fields[0]]) : node.Case === "Svg" ? new Types.DomNode("Element", [mapElem(mapping, node.Fields[0][0], node.Fields[0][1]), map$$1(function (node_1) {
-        return map$5(mapping, node_1);
-    }, node.Fields[1])]) : new Types.DomNode("Element", [mapElem(mapping, node.Fields[0][0], node.Fields[0][1]), map$$1(function (node_1) {
-        return map$5(mapping, node_1);
-    }, node.Fields[1])]);
-}
-var Attributes = function (__exports) {
-    var classBaseList = __exports.classBaseList = function (b, list) {
-        return new Types.Attribute("Attribute", [["class", fsFormat("%s %s")(function (x) {
-            return x;
-        })(b)(join(" ", map$1(function (tupledArg) {
-            return tupledArg[0];
-        }, filter$1(function (tupledArg) {
-            return tupledArg[1];
-        }, list))))]]);
-    };
-
-    return __exports;
-}({});
-var Svg = function (__exports) {
-    var svgNS = __exports.svgNS = function () {
-        return new Types.Attribute("Property", [["namespace", "http://www.w3.org/2000/svg"]]);
-    };
-
-    return __exports;
-}({});
 
 var _createClass$9 = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
@@ -4797,8 +4747,6 @@ SoftSetHook.prototype.hook = function (node, propertyName) {
     }
 };
 
-/*global window, global*/
-
 var root = typeof window !== 'undefined' ?
     window : typeof commonjsGlobal !== 'undefined' ?
     commonjsGlobal : {};
@@ -5252,78 +5200,219 @@ var _createClass = function () { function defineProperties(target, props) { for 
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var Details = function () {
-    function Details(caseName, fields) {
-        _classCallCheck(this, Details);
+var Character = function (__exports) {
+    var Model = __exports.Model = function () {
+        function Model(name, films) {
+            _classCallCheck(this, Model);
 
-        this.Case = caseName;
-        this.Fields = fields;
-    }
+            this.name = name;
+            this.films = films;
+        }
 
-    _createClass(Details, [{
-        key: _Symbol.reflection,
-        value: function () {
-            return {
-                type: "Main.Details",
-                interfaces: ["FSharpUnion", "System.IEquatable", "System.IComparable"],
-                cases: {
-                    Character: ["string"],
-                    Film: ["string", "string"]
-                }
+        _createClass(Model, [{
+            key: _Symbol.reflection,
+            value: function () {
+                return {
+                    type: "MainFirst.Character.Model",
+                    interfaces: ["FSharpRecord", "System.IEquatable", "System.IComparable"],
+                    properties: {
+                        name: "string",
+                        films: makeGeneric(List$1, {
+                            T: "string"
+                        })
+                    }
+                };
+            }
+        }, {
+            key: "Equals",
+            value: function (other) {
+                return equalsRecords(this, other);
+            }
+        }, {
+            key: "CompareTo",
+            value: function (other) {
+                return compareRecords(this, other);
+            }
+        }]);
+
+        return Model;
+    }();
+
+    setType("MainFirst.Character.Model", Model);
+
+    var parse = __exports.parse = function (json) {
+        return ofJson(json, {
+            T: Model
+        });
+    };
+
+    var mainStyle = __exports.mainStyle = function () {
+        return new Types.Attribute("Style", [ofArray([["background-color", "rgba(230, 126, 34,1.0)"], ["width", "200px"], ["height", "200px"], ["color", "white"], ["font-family", "-apple-system, system, sans-serif"], ["margin", "20px 0px 0px 20px"], ["cursor", "pointer"]])]);
+    };
+
+    var nameStyle = __exports.nameStyle = function () {
+        return new Types.Attribute("Style", [ofArray([["padding", "20px"], ["font-size", "18px"]])]);
+    };
+
+    var view = __exports.view = function (model) {
+        return function () {
+            var tagName = "div";
+            return function (children) {
+                return new Types.DomNode("Element", [[tagName, ofArray([mainStyle(), function () {
+                    var h = function h(e) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        return function (_arg1) {
+                            return model;
+                        }(e);
+                    };
+
+                    return new Types.Attribute("EventHandler", [["onclick", h]]);
+                }()])], children]);
             };
-        }
-    }, {
-        key: "Equals",
-        value: function (other) {
-            return equalsUnions(this, other);
-        }
-    }, {
-        key: "CompareTo",
-        value: function (other) {
-            return compareUnions(this, other);
-        }
-    }]);
-
-    return Details;
-}();
-setType("Main.Details", Details);
-var Entity = function () {
-    function Entity(related, details) {
-        _classCallCheck(this, Entity);
-
-        this.related = related;
-        this.details = details;
-    }
-
-    _createClass(Entity, [{
-        key: _Symbol.reflection,
-        value: function () {
-            return {
-                type: "Main.Entity",
-                interfaces: ["FSharpRecord", "System.IEquatable", "System.IComparable"],
-                properties: {
-                    related: makeGeneric(List$1, {
-                        T: "string"
-                    }),
-                    details: Details
-                }
+        }()(ofArray([function () {
+            var tagName = "div";
+            return function (children) {
+                return new Types.DomNode("Element", [[tagName, ofArray([nameStyle()])], children]);
             };
-        }
-    }, {
-        key: "Equals",
-        value: function (other) {
-            return equalsRecords(this, other);
-        }
-    }, {
-        key: "CompareTo",
-        value: function (other) {
-            return compareRecords(this, other);
-        }
-    }]);
+        }()(ofArray([new Types.DomNode("Text", [model.name])]))]));
+    };
 
-    return Entity;
-}();
-setType("Main.Entity", Entity);
+    return __exports;
+}({});
+var Film = function (__exports) {
+    var Model = __exports.Model = function () {
+        function Model(title, episodeId, characters) {
+            _classCallCheck(this, Model);
+
+            this.title = title;
+            this.episodeId = episodeId;
+            this.characters = characters;
+        }
+
+        _createClass(Model, [{
+            key: _Symbol.reflection,
+            value: function () {
+                return {
+                    type: "MainFirst.Film.Model",
+                    interfaces: ["FSharpRecord", "System.IEquatable", "System.IComparable"],
+                    properties: {
+                        title: "string",
+                        episodeId: "number",
+                        characters: makeGeneric(List$1, {
+                            T: "string"
+                        })
+                    }
+                };
+            }
+        }, {
+            key: "Equals",
+            value: function (other) {
+                return equalsRecords(this, other);
+            }
+        }, {
+            key: "CompareTo",
+            value: function (other) {
+                return compareRecords(this, other);
+            }
+        }]);
+
+        return Model;
+    }();
+
+    setType("MainFirst.Film.Model", Model);
+
+    var ModelJSON = __exports.ModelJSON = function () {
+        function ModelJSON(title, episode_id, characters) {
+            _classCallCheck(this, ModelJSON);
+
+            this.title = title;
+            this.episode_id = episode_id;
+            this.characters = characters;
+        }
+
+        _createClass(ModelJSON, [{
+            key: _Symbol.reflection,
+            value: function () {
+                return {
+                    type: "MainFirst.Film.ModelJSON",
+                    interfaces: ["FSharpRecord", "System.IEquatable", "System.IComparable"],
+                    properties: {
+                        title: "string",
+                        episode_id: "number",
+                        characters: makeGeneric(List$1, {
+                            T: "string"
+                        })
+                    }
+                };
+            }
+        }, {
+            key: "Equals",
+            value: function (other) {
+                return equalsRecords(this, other);
+            }
+        }, {
+            key: "CompareTo",
+            value: function (other) {
+                return compareRecords(this, other);
+            }
+        }]);
+
+        return ModelJSON;
+    }();
+
+    setType("MainFirst.Film.ModelJSON", ModelJSON);
+
+    var parse = __exports.parse = function (str) {
+        var obj = ofJson(str, {
+            T: ModelJSON
+        });
+        return new Model(obj.title, obj.episode_id, obj.characters);
+    };
+
+    var mainStyle = __exports.mainStyle = function () {
+        return new Types.Attribute("Style", [ofArray([["background-color", "rgba(52, 152, 219,1.0)"], ["width", "200px"], ["height", "200px"], ["color", "white"], ["font-family", "-apple-system, system, sans-serif"], ["margin", "20px 0px 0px 20px"], ["cursor", "pointer"]])]);
+    };
+
+    var nameStyle = __exports.nameStyle = function () {
+        return new Types.Attribute("Style", [ofArray([["padding", "20px"], ["font-size", "18px"]])]);
+    };
+
+    var numberStyle = __exports.numberStyle = function () {
+        return new Types.Attribute("Style", [ofArray([["padding", "20px 20px 0px 20px"], ["font-size", "60px"]])]);
+    };
+
+    var view = __exports.view = function (model) {
+        return function () {
+            var tagName = "div";
+            return function (children) {
+                return new Types.DomNode("Element", [[tagName, ofArray([mainStyle(), function () {
+                    var h = function h(e) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        return function (_arg1) {
+                            return model;
+                        }(e);
+                    };
+
+                    return new Types.Attribute("EventHandler", [["onclick", h]]);
+                }()])], children]);
+            };
+        }()(ofArray([function () {
+            var tagName = "div";
+            return function (children) {
+                return new Types.DomNode("Element", [[tagName, ofArray([numberStyle()])], children]);
+            };
+        }()(ofArray([new Types.DomNode("Text", [String(model.episodeId)])])), function () {
+            var tagName = "div";
+            return function (children) {
+                return new Types.DomNode("Element", [[tagName, ofArray([nameStyle()])], children]);
+            };
+        }()(ofArray([new Types.DomNode("Text", [model.title])]))]));
+    };
+
+    return __exports;
+}({});
 var Model = function () {
     function Model(caseName, fields) {
         _classCallCheck(this, Model);
@@ -5336,15 +5425,19 @@ var Model = function () {
         key: _Symbol.reflection,
         value: function () {
             return {
-                type: "Main.Model",
+                type: "MainFirst.Model",
                 interfaces: ["FSharpUnion", "System.IEquatable", "System.IComparable"],
                 cases: {
-                    ErrorScreen: [],
-                    InitialScreen: [],
-                    List: [Entity, makeGeneric(List$1, {
-                        T: Entity
+                    CharactersFromFilm: [Film.Model, makeGeneric(List$1, {
+                        T: Character.Model
                     })],
-                    Loading: [Entity]
+                    ErrorScreen: [],
+                    FilmsFromCharacter: [Character.Model, makeGeneric(List$1, {
+                        T: Film.Model
+                    })],
+                    InitialScreen: [],
+                    LoadingCharacters: [Film.Model],
+                    LoadingFilms: [Character.Model]
                 }
             };
         }
@@ -5362,114 +5455,7 @@ var Model = function () {
 
     return Model;
 }();
-setType("Main.Model", Model);
-var CharacterResponseJson = function () {
-    function CharacterResponseJson(name, films) {
-        _classCallCheck(this, CharacterResponseJson);
-
-        this.name = name;
-        this.films = films;
-    }
-
-    _createClass(CharacterResponseJson, [{
-        key: _Symbol.reflection,
-        value: function () {
-            return {
-                type: "Main.CharacterResponseJson",
-                interfaces: ["FSharpRecord", "System.IEquatable", "System.IComparable"],
-                properties: {
-                    name: "string",
-                    films: makeGeneric(List$1, {
-                        T: "string"
-                    })
-                }
-            };
-        }
-    }, {
-        key: "Equals",
-        value: function (other) {
-            return equalsRecords(this, other);
-        }
-    }, {
-        key: "CompareTo",
-        value: function (other) {
-            return compareRecords(this, other);
-        }
-    }]);
-
-    return CharacterResponseJson;
-}();
-setType("Main.CharacterResponseJson", CharacterResponseJson);
-var FilmResponseJson = function () {
-    function FilmResponseJson(title, episode_id, characters) {
-        _classCallCheck(this, FilmResponseJson);
-
-        this.title = title;
-        this.episode_id = episode_id;
-        this.characters = characters;
-    }
-
-    _createClass(FilmResponseJson, [{
-        key: _Symbol.reflection,
-        value: function () {
-            return {
-                type: "Main.FilmResponseJson",
-                interfaces: ["FSharpRecord", "System.IEquatable", "System.IComparable"],
-                properties: {
-                    title: "string",
-                    episode_id: "number",
-                    characters: makeGeneric(List$1, {
-                        T: "string"
-                    })
-                }
-            };
-        }
-    }, {
-        key: "Equals",
-        value: function (other) {
-            return equalsRecords(this, other);
-        }
-    }, {
-        key: "CompareTo",
-        value: function (other) {
-            return compareRecords(this, other);
-        }
-    }]);
-
-    return FilmResponseJson;
-}();
-setType("Main.FilmResponseJson", FilmResponseJson);
-function ofBetterJson(text, _genArgs) {
-    try {
-        var json = ofJson(text, {
-            T: _genArgs.a
-        });
-        return json;
-    } catch (matchValue) {
-        return null;
-    }
-}
-function parse(text) {
-    var chRecord = ofBetterJson(text, {
-        a: CharacterResponseJson
-    });
-    var filmRecord = ofBetterJson(text, {
-        a: FilmResponseJson
-    });
-    var matchValue = [chRecord, filmRecord];
-
-    if (matchValue[0] != null) {
-        var ch = matchValue[0];
-        return new Entity(ch.films, new Details("Character", [ch.name]));
-    } else {
-        if (matchValue[1] != null) {
-            var film = matchValue[1];
-            return new Entity(film.characters, new Details("Film", [film.title, String(film.episode_id)]));
-        } else {
-            throw new Error("/home/lucas.reis/Projects/star-wars-fable/src/Main.fsx", 67, 12);
-        }
-    }
-}
+setType("MainFirst.Model", Model);
 var Msg = function () {
     function Msg(caseName, fields) {
         _classCallCheck(this, Msg);
@@ -5482,13 +5468,17 @@ var Msg = function () {
         key: _Symbol.reflection,
         value: function () {
             return {
-                type: "Main.Msg",
+                type: "MainFirst.Msg",
                 interfaces: ["FSharpUnion", "System.IEquatable", "System.IComparable"],
                 cases: {
                     FetchFail: [],
-                    Load: [Entity],
-                    ToList: [Entity, makeGeneric(List$1, {
-                        T: Entity
+                    LoadCharacters: [Film.Model],
+                    LoadFilms: [Character.Model],
+                    ToCharactersFromFilm: [Film.Model, makeGeneric(List$1, {
+                        T: Character.Model
+                    })],
+                    ToFilmsFromCharacter: [Character.Model, makeGeneric(List$1, {
+                        T: Film.Model
                     })]
                 }
             };
@@ -5507,96 +5497,57 @@ var Msg = function () {
 
     return Msg;
 }();
-setType("Main.Msg", Msg);
-function fetchEntity(url) {
+setType("MainFirst.Msg", Msg);
+function fetchEntity(url, parser) {
     return function (builder_) {
         return builder_.Delay(function () {
-            var urlWithoutProtocol = replace$$1(url, "http://", "//");
-            return _fetch(urlWithoutProtocol, {}).then(function (_arg1) {
+            return _fetch(url, {}).then(function (_arg1) {
                 return _arg1.text().then(function (_arg2) {
-                    return Promise.resolve(parse(_arg2));
+                    return Promise.resolve(parser(_arg2));
                 });
             });
         });
     }(PromiseImpl.promise);
 }
-function getFirstCharacter(handler) {
+function getCharacter(handler) {
     (function (pr) {
         return pr.then(handler);
-    })(function (builder_) {
-        return builder_.Delay(function () {
-            return fetchEntity("http://swapi.co/api/people/2/").then(function (_arg1) {
-                return Promise.resolve(new Msg("Load", [_arg1]));
-            });
-        });
-    }(PromiseImpl.promise));
+    })(fetchEntity("http://swapi.co/api/people/1/", Character.parse).then(function (arg0) {
+        return new Msg("LoadFilms", [arg0]);
+    }).catch(function (_arg1) {
+        return new Msg("FetchFail", []);
+    }));
 }
-function getRelatedEntities(entity, handler) {
+function getCharacters(film, handler) {
     (function (pr) {
         return pr.then(handler);
     })(Promise.all(map$$1(function (url) {
-        return fetchEntity(url);
-    }, entity.related)).then(function (list) {
-        return new Msg("ToList", [entity, ofArray(list)]);
+        return fetchEntity(url, Character.parse);
+    }, film.characters)).then(function (chs) {
+        return new Msg("ToCharactersFromFilm", [film, ofArray(chs)]);
+    }).catch(function (_arg1) {
+        return new Msg("FetchFail", []);
+    }));
+}
+function getFilms(character, handler) {
+    (function (pr) {
+        return pr.then(handler);
+    })(Promise.all(map$$1(function (url) {
+        return fetchEntity(url, function (str) {
+            return Film.parse(str);
+        });
+    }, character.films)).then(function (fs) {
+        return new Msg("ToFilmsFromCharacter", [character, ofArray(fs)]);
+    }).catch(function (_arg1) {
+        return new Msg("FetchFail", []);
     }));
 }
 function update(model, msg) {
-    return msg.Case === "ToList" ? [new Model("List", [msg.Fields[0], msg.Fields[1]]), new List$1()] : msg.Case === "FetchFail" ? [new Model("ErrorScreen", []), new List$1()] : [new Model("Loading", [msg.Fields[0]]), ofArray([function (handler) {
-        getRelatedEntities(msg.Fields[0], handler);
+    return msg.Case === "ToCharactersFromFilm" ? [new Model("CharactersFromFilm", [msg.Fields[0], msg.Fields[1]]), new List$1()] : msg.Case === "LoadFilms" ? [new Model("LoadingFilms", [msg.Fields[0]]), ofArray([function (handler) {
+        getFilms(msg.Fields[0], handler);
+    }])] : msg.Case === "ToFilmsFromCharacter" ? [new Model("FilmsFromCharacter", [msg.Fields[0], msg.Fields[1]]), new List$1()] : msg.Case === "FetchFail" ? [new Model("ErrorScreen", []), new List$1()] : [new Model("LoadingCharacters", [msg.Fields[0]]), ofArray([function (handler) {
+        getCharacters(msg.Fields[0], handler);
     }])];
-}
-function bgColor(entity) {
-    return entity.details.Case === "Film" ? "rgba(52, 152, 219,1.0)" : "rgba(230, 126, 34,1.0)";
-}
-function mainStyle(entity) {
-    return new Types.Attribute("Style", [ofArray([["background-color", bgColor(entity)], ["width", "200px"], ["height", "200px"], ["color", "white"], ["font-family", "-apple-system, system, sans-serif"], ["margin", "20px 0px 0px 20px"], ["cursor", "pointer"]])]);
-}
-function filmNumberStyle() {
-    return new Types.Attribute("Style", [ofArray([["padding", "20px 20px 0px 20px"], ["font-size", "60px"]])]);
-}
-function captionStyle() {
-    return new Types.Attribute("Style", [ofArray([["padding", "20px"], ["font-size", "18px"]])]);
-}
-function filmContents(title, episode) {
-    return ofArray([function () {
-        var tagName = "div";
-        return function (children) {
-            return new Types.DomNode("Element", [[tagName, ofArray([filmNumberStyle()])], children]);
-        };
-    }()(ofArray([new Types.DomNode("Text", [episode])])), function () {
-        var tagName = "div";
-        return function (children) {
-            return new Types.DomNode("Element", [[tagName, ofArray([captionStyle()])], children]);
-        };
-    }()(ofArray([new Types.DomNode("Text", [title])]))]);
-}
-function characterContents(name) {
-    return ofArray([function () {
-        var tagName = "div";
-        return function (children) {
-            return new Types.DomNode("Element", [[tagName, ofArray([captionStyle()])], children]);
-        };
-    }()(ofArray([new Types.DomNode("Text", [name])]))]);
-}
-function entityView(entity) {
-    var attributes = ofArray([mainStyle(entity), function () {
-        var h = function h(e) {
-            e.stopPropagation();
-            e.preventDefault();
-            return function (_arg1) {
-                return entity;
-            }(e);
-        };
-
-        return new Types.Attribute("EventHandler", [["onclick", h]]);
-    }()]);
-    var contents = entity.details.Case === "Character" ? characterContents(entity.details.Fields[0]) : filmContents(entity.details.Fields[0], entity.details.Fields[1]);
-    return function () {
-        var tagName = "div";
-        return function (children) {
-            return new Types.DomNode("Element", [[tagName, attributes], children]);
-        };
-    }()(contents);
 }
 function messageStyle() {
     return new Types.Attribute("Style", [ofArray([["margin", "20px 0px 0px 20px"], ["width", "200px"], ["height", "200px"], ["font-family", "-apple-system, system, sans-serif"], ["color", "rgba(149, 165, 166,1.0)"], ["font-size", "18px"]])]);
@@ -5609,41 +5560,57 @@ function messageView(t) {
         };
     }()(ofArray([new Types.DomNode("Text", [t])]));
 }
-function loadingMessageView(entity) {
-    return entity.details.Case === "Character" ? messageView("Loading " + entity.details.Fields[0] + " films...") : messageView("Loading " + entity.details.Fields[0] + " characters...");
-}
-function mappedEntityView(entity) {
-    return map$5(function (arg0) {
-        return new Msg("Load", [arg0]);
-    }, entityView(entity));
-}
+var mappedCharacterView = function mappedCharacterView($var45) {
+    return map$4(function (arg0) {
+        return new Msg("LoadFilms", [arg0]);
+    }, Character.view($var45));
+};
+var mappedFilmView = function mappedFilmView($var46) {
+    return map$4(function (arg0) {
+        return new Msg("LoadCharacters", [arg0]);
+    }, Film.view($var46));
+};
 function view(model) {
-    return model.Case === "Loading" ? function () {
+    return model.Case === "LoadingFilms" ? function () {
         var tagName = "div";
         return function (children) {
             return new Types.DomNode("Element", [[tagName, ofArray([new Types.Attribute("Style", [ofArray([["display", "flex"]])])])], children]);
         };
-    }()(ofArray([mappedEntityView(model.Fields[0]), loadingMessageView(model.Fields[0])])) : model.Case === "List" ? function () {
-        var listView = map$$1(function (entity) {
-            return mappedEntityView(entity);
-        }, model.Fields[1]);
+    }()(ofArray([mappedCharacterView(model.Fields[0]), messageView("Loading " + model.Fields[0].name + " films...")])) : model.Case === "FilmsFromCharacter" ? function () {
+        var filmsView = map$$1(mappedFilmView, model.Fields[1]);
         return function () {
             var tagName = "div";
             return function (children) {
                 return new Types.DomNode("Element", [[tagName, ofArray([new Types.Attribute("Style", [ofArray([["display", "flex"]])])])], children]);
             };
-        }()(ofArray([mappedEntityView(model.Fields[0]), function () {
+        }()(ofArray([mappedCharacterView(model.Fields[0]), function () {
             var tagName = "div";
             return function (children) {
                 return new Types.DomNode("Element", [[tagName, new List$1()], children]);
             };
-        }()(listView)]));
+        }()(filmsView)]));
+    }() : model.Case === "LoadingCharacters" ? function () {
+        var tagName = "div";
+        return function (children) {
+            return new Types.DomNode("Element", [[tagName, ofArray([new Types.Attribute("Style", [ofArray([["display", "flex"]])])])], children]);
+        };
+    }()(ofArray([mappedFilmView(model.Fields[0]), messageView("Loading " + model.Fields[0].title + " characters...")])) : model.Case === "CharactersFromFilm" ? function () {
+        var chsView = map$$1(mappedCharacterView, model.Fields[1]);
+        return function () {
+            var tagName = "div";
+            return function (children) {
+                return new Types.DomNode("Element", [[tagName, ofArray([new Types.Attribute("Style", [ofArray([["display", "flex"]])])])], children]);
+            };
+        }()(ofArray([mappedFilmView(model.Fields[0]), function () {
+            var tagName = "div";
+            return function (children) {
+                return new Types.DomNode("Element", [[tagName, new List$1()], children]);
+            };
+        }()(chsView)]));
     }() : model.Case === "ErrorScreen" ? messageView("An error ocurred. Please refresh the page and try again - and may the Force be with you!") : messageView("Loading amazing characters and films...");
 }
-AppApi.start(AppApi.withSubscriber(function (x) {
-    console.log("Event received: ", x);
-}, AppApi.withInitMessage(function (handler) {
-    getFirstCharacter(handler);
+AppApi.start(AppApi.withInitMessage(function (handler) {
+    getCharacter(handler);
 }, AppApi.withStartNodeSelector("#app", AppApi.createApp(new Model("InitialScreen", []), function (model) {
     return view(model);
 }, function (model) {
@@ -5656,33 +5623,23 @@ AppApi.start(AppApi.withSubscriber(function (x) {
             return createRender(selector, handler, view_1);
         };
     };
-})))));
+}))));
 
-exports.Details = Details;
-exports.Entity = Entity;
+exports.Character = Character;
+exports.Film = Film;
 exports.Model = Model;
-exports.CharacterResponseJson = CharacterResponseJson;
-exports.FilmResponseJson = FilmResponseJson;
-exports.ofBetterJson = ofBetterJson;
-exports.parse = parse;
 exports.Msg = Msg;
 exports.fetchEntity = fetchEntity;
-exports.getFirstCharacter = getFirstCharacter;
-exports.getRelatedEntities = getRelatedEntities;
+exports.getCharacter = getCharacter;
+exports.getCharacters = getCharacters;
+exports.getFilms = getFilms;
 exports.update = update;
-exports.bgColor = bgColor;
-exports.mainStyle = mainStyle;
-exports.filmNumberStyle = filmNumberStyle;
-exports.captionStyle = captionStyle;
-exports.filmContents = filmContents;
-exports.characterContents = characterContents;
-exports.entityView = entityView;
 exports.messageStyle = messageStyle;
 exports.messageView = messageView;
-exports.loadingMessageView = loadingMessageView;
-exports.mappedEntityView = mappedEntityView;
+exports.mappedCharacterView = mappedCharacterView;
+exports.mappedFilmView = mappedFilmView;
 exports.view = view;
 
-}((this.Main = this.Main || {})));
+}((this.MainFirst = this.MainFirst || {})));
 
 //# sourceMappingURL=bundle.js.map

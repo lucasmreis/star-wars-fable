@@ -20,11 +20,6 @@ open Fable.Arch
 open Fable.Arch.Html
 open Fable.Arch.App.AppApi
 
-// let getEntity = importMember<string->string> "./js/get-entity.js"
-
-// let someValue = getEntity "someString"
-
-
 // -----------------------------------------------------------------------------------
 // MODEL
 //
@@ -54,7 +49,7 @@ type FilmResponseJson =
       episode_id : int
       characters : string list }
 
-let [<PassGenericsAttribute>] ofBetterJson<'a> text =
+let [<PassGenericsAttribute>] betterOfJson<'a> text =
     try
         let json = ofJson<'a> text
         Some json
@@ -62,15 +57,17 @@ let [<PassGenericsAttribute>] ofBetterJson<'a> text =
         None
 
 let parse text =
-    let chRecord = ofBetterJson<CharacterResponseJson> text
-    let filmRecord = ofBetterJson<FilmResponseJson> text
-    match ( chRecord , filmRecord ) with
-    | Some ch , _ ->
-        { related = ch.films
-          details = Character ch.name }
-    | _ , Some film ->
-        { related = film.characters
-          details = Film ( film.title , film.episode_id.ToString() ) }
+    let chRecord = betterOfJson<CharacterResponseJson> text
+    let filmRecord = betterOfJson<FilmResponseJson> text
+    match chRecord , filmRecord with
+        | Some ch , _ ->
+            { related = ch.films
+              details = Character ch.name }
+        | _ , Some film ->
+            { related = film.characters
+              details = Film ( film.title , film.episode_id.ToString() ) }
+        | _ ->
+            failwith "could not parse entity"
 
 
 // -----------------------------------------------------------------------------------
@@ -91,9 +88,9 @@ let fetchEntity (url:Url) =
         return parse response }
 
 let getFirstCharacter handler =
-    promise {
-        let! entity = fetchEntity "http://swapi.co/api/people/2/"
-        return Load entity }
+    fetchEntity "http://swapi.co/api/people/2/"
+    |> Promise.map Load
+    |> Promise.catch ( fun _ -> FetchFail )
     |> Promise.map handler
     |> ignore
 
@@ -101,6 +98,7 @@ let getRelatedEntities (entity:Entity) handler =
     List.map fetchEntity entity.related
     |> Promise.Parallel
     |> Promise.map ( fun list -> ToList ( entity , List.ofArray list ) )
+    |> Promise.catch ( fun _ -> FetchFail )
     |> Promise.map handler
     |> ignore
 
@@ -194,5 +192,5 @@ let view model =
 createApp InitialScreen view update Virtualdom.createRender
 |> withStartNodeSelector "#app"
 |> withInitMessage getFirstCharacter
-|> withSubscriber (fun x -> Fable.Import.Browser.console.log("Event received: ", x))
+|> withSubscriber ( fun x -> Fable.Import.Browser.console.log("Event received: ", x) )
 |> start
