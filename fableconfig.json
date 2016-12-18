@@ -1,6 +1,6 @@
 {
   "outDir": "build",
-  "projFile": "./src/MainFirst.fsx",
+  "projFile": "./src/Main.fsx",
   "sourceMaps": true,
   "rollup": {
     "plugins": [

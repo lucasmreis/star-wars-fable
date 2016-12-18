@@ -56,18 +56,22 @@ let [<PassGenericsAttribute>] betterOfJson<'a> text =
     with _ ->
         None
 
+let (|IsCharacter|_|) text =
+    betterOfJson<CharacterResponseJson> text
+
+let (|IsFilm|_|) text =
+    betterOfJson<FilmResponseJson> text
+
 let parse text =
-    let chRecord = betterOfJson<CharacterResponseJson> text
-    let filmRecord = betterOfJson<FilmResponseJson> text
-    match chRecord , filmRecord with
-        | Some ch , _ ->
-            { related = ch.films
-              details = Character ch.name }
-        | _ , Some film ->
-            { related = film.characters
-              details = Film ( film.title , film.episode_id.ToString() ) }
-        | _ ->
-            failwith "could not parse entity"
+    match text with
+    | IsCharacter ch ->
+        { related = ch.films
+          details = Character ch.name }
+    | IsFilm film ->
+        { related = film.characters
+          details = Film ( film.title , film.episode_id.ToString() ) }
+    | _ ->
+        failwith "could not parse entity"
 
 
 // -----------------------------------------------------------------------------------
